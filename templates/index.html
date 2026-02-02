@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Riistakamera Annotator</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📸 Riistakamera Annotator</h1>
+            <div class="stats">
+                <span id="image-counter">0 / 0</span>
+                <span id="annotation-count">0 annotaatiota</span>
+            </div>
+        </header>
+
+        <main>
+            <div class="canvas-container">
+                <canvas id="image-canvas"></canvas>
+                <div id="loading">Ladataan kuvia...</div>
+                <div id="no-images" style="display: none;">
+                    Ei kuvia kansiossa. Lisää kuvia: ~/clawd/riistakamera/
+                </div>
+            </div>
+
+            <div class="controls">
+                <div class="control-group">
+                    <label for="species-select">Eläinlaji:</label>
+                    <select id="species-select">
+                        <option value="">-- Valitse laji --</option>
+                        <option value="hirvi">🦌 Hirvi</option>
+                        <option value="kauris">🦌 Kauris</option>
+                        <option value="kettu">🦊 Kettu</option>
+                        <option value="jänis">🐰 Jänis</option>
+                        <option value="ilves">🐱 Ilves</option>
+                        <option value="karhu">🐻 Karhu</option>
+                        <option value="susi">🐺 Susi</option>
+                        <option value="muu">❓ Muu</option>
+                    </select>
+                </div>
+
+                <div class="button-group">
+                    <button id="clear-current" class="btn btn-warning">🗑️ Tyhjennä nykyinen</button>
+                    <button id="save-btn" class="btn btn-primary">💾 Tallenna</button>
+                    <button id="next-btn" class="btn btn-success">➡️ Seuraava kuva</button>
+                </div>
+            </div>
+
+            <div class="annotations-list">
+                <h3>Annotaatiot:</h3>
+                <ul id="annotations-ul"></ul>
+            </div>
+
+            <div class="instructions">
+                <h4>Ohjeet:</h4>
+                <ol>
+                    <li>Vedä hiirellä laatikko eläimen ympärille</li>
+                    <li>Valitse laji pudotusvalikosta</li>
+                    <li>Klikkaa "Tallenna" tallentaaksesi annotaation</li>
+                    <li>Klikkaa "Seuraava kuva" siirtyäksesi eteenpäin</li>
+                </ol>
+                <p><strong>Pikatoiminnot:</strong> Enter = Tallenna | N = Seuraava | C = Tyhjennä</p>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
