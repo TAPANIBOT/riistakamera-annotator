@@ -225,3 +225,76 @@ function handleMouseUp(e) {
 // Rest of the existing code remains the same
 // ... (loadImages, saveCurrentAnnotation, etc.)
 
+
+
+// Undo/Redo functionality
+let history = [];
+let historyIndex = -1;
+
+function saveState() {
+    // Deep copy of boxes to prevent reference issues
+    const currentState = JSON.parse(JSON.stringify(boxes));
+    
+    // If we're not at the end of history, truncate future states
+    if (historyIndex < history.length - 1) {
+        history = history.slice(0, historyIndex + 1);
+    }
+    
+    // Add new state
+    history.push(currentState);
+    
+    // Limit history to 50 states
+    if (history.length > 50) {
+        history.shift();
+    }
+    
+    // Move history index to the latest state
+    historyIndex = history.length - 1;
+}
+
+// Undo functionality (Ctrl+Z)
+function undoAction(event) {
+    if (event.ctrlKey && event.key === 'z') {
+        event.preventDefault();
+        if (historyIndex > 0) {
+            historyIndex--;
+            boxes = JSON.parse(JSON.stringify(history[historyIndex]));
+            redrawBoxes();
+        }
+    }
+}
+
+// Redo functionality (Ctrl+Y)
+function redoAction(event) {
+    if (event.ctrlKey && event.key === 'y') {
+        event.preventDefault();
+        if (historyIndex < history.length - 1) {
+            historyIndex++;
+            boxes = JSON.parse(JSON.stringify(history[historyIndex]));
+            redrawBoxes();
+        }
+    }
+
+// Clear history when new image is loaded
+function clearHistory() {
+    history = [];
+    historyIndex = -1;
+}
+
+// Modify existing event listeners to save state
+const originalDrawBox = drawBox;
+drawBox = function(...args) {
+    originalDrawBox(...args);
+    saveState();
+}
+
+const originalDeleteBox = deleteBox;
+deleteBox = function(...args) {
+    originalDeleteBox(...args);
+    saveState();
+}
+
+// Add keyboard event listeners
+document.addEventListener('keydown', undoAction);
+document.addEventListener('keydown', redoAction);
+document.addEventListener('imageLoaded', clearHistory);
