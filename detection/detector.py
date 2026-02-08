@@ -259,38 +259,109 @@ class WildlifeDetector:
                 scores = result['classifications'].get('scores', [])
 
                 if classes and scores:
-                    top_class = classes[0].lower()
+                    # SpeciesNet luokka: "uuid;class;order;family;genus;species;common"
+                    top_raw = classes[0]
                     top_score = float(scores[0])
 
-                    # Muunna SpeciesNet taksonomia suomalaiseksi lajinimeksi
-                    finnish_name = SPECIESNET_TO_FINNISH.get(top_class)
+                    finnish_name = self._parse_speciesnet_class(top_raw)
 
-                    # Jos ei suoraa vastaavuutta, yritä osittainen haku
-                    if finnish_name is None:
-                        for taxon, name in SPECIESNET_TO_FINNISH.items():
-                            if taxon in top_class or top_class in taxon:
-                                finnish_name = name
-                                break
+                    # Jos top1 on matala, yritä aggregoida lajitason tuloksia
+                    if finnish_name == 'muu' and len(classes) > 1:
+                        # Yhdistä saman lajin tulokset
+                        species_scores = {}
+                        for cls_str, score in zip(classes[:5], scores[:5]):
+                            name = self._parse_speciesnet_class(cls_str)
+                            species_scores[name] = species_scores.get(name, 0) + float(score)
+                        # Valitse paras (paitsi 'muu')
+                        best = max(
+                            ((n, s) for n, s in species_scores.items() if n != 'muu'),
+                            key=lambda x: x[1],
+                            default=None,
+                        )
+                        if best and best[1] > top_score:
+                            finnish_name = best[0]
+                            top_score = best[1]
 
-                    # Jos tuntematon laji, käytä 'muu'
-                    if finnish_name is None:
-                        # Tarkista onko lintu
-                        if 'aves' in top_class or 'bird' in top_class:
-                            finnish_name = 'linnut'
-                        else:
-                            finnish_name = 'muu'
-
-                    if top_score >= 0.3:  # Minimikonfidenssi
+                    if top_score >= 0.1:  # Matala kynnys riistakamerakuville
                         return {
                             'species': finnish_name,
                             'confidence': round(top_score, 4),
-                            'speciesnet_class': top_class,
+                            'speciesnet_class': top_raw,
                         }
 
         except Exception as e:
             print(f"SpeciesNet-tunnistusvirhe: {e}")
 
         return None
+
+    @staticmethod
+    def _parse_speciesnet_class(class_str):
+        """Muunna SpeciesNet luokkastring suomalaiseksi lajinimeksi.
+
+        SpeciesNet-muoto: "uuid;class;order;family;genus;species;common_name"
+        Esim: "xxx;mammalia;lagomorpha;leporidae;lepus;europaeus;european hare"
+        """
+        parts = class_str.lower().split(';')
+        # parts: [uuid, class, order, family, genus, species, common_name]
+
+        genus = parts[4].strip() if len(parts) > 4 else ''
+        species = parts[5].strip() if len(parts) > 5 else ''
+        common = parts[6].strip() if len(parts) > 6 else ''
+        order = parts[2].strip() if len(parts) > 2 else ''
+        family = parts[3].strip() if len(parts) > 3 else ''
+
+        # Yritä genus+species (taksonominen nimi)
+        if genus and species:
+            full_name = f'{genus} {species}'
+            if full_name in SPECIESNET_TO_FINNISH:
+                return SPECIESNET_TO_FINNISH[full_name]
+
+        # Yritä englanninkielisellä nimellä
+        common_to_finnish = {
+            'roe deer': 'kauris',
+            'white-tailed deer': 'peura',
+            'european hare': 'janis',
+            'mountain hare': 'janis',
+            'red fox': 'kettu',
+            'raccoon dog': 'supikoira',
+            'human': 'ihminen',
+            'domestic dog': 'koira',
+            'dog': 'koira',
+            'moose': 'muu',
+            'wild boar': 'muu',
+            'eurasian lynx': 'muu',
+            'european badger': 'muu',
+            'european rabbit': 'janis',
+            'white-tailed jackrabbit': 'janis',
+        }
+        if common in common_to_finnish:
+            return common_to_finnish[common]
+
+        # Yritä suvun perusteella
+        genus_map = {
+            'capreolus': 'kauris',
+            'odocoileus': 'peura',
+            'lepus': 'janis',
+            'oryctolagus': 'janis',
+            'vulpes': 'kettu',
+            'nyctereutes': 'supikoira',
+            'homo': 'ihminen',
+            'canis': 'koira',
+        }
+        if genus in genus_map:
+            return genus_map[genus]
+
+        # Yritä lahkon perusteella
+        if order == 'lagomorpha':
+            return 'janis'
+        if order in ('passeriformes', 'anseriformes', 'galliformes',
+                     'accipitriformes', 'strigiformes', 'charadriiformes'):
+            return 'linnut'
+        if 'bird' in common or 'aves' in parts[1] if len(parts) > 1 else False:
+            return 'linnut'
+
+        # Rodentia → 'muu' (ei erillinen luokka)
+        return 'muu'
 
     def _classify_species(self, image_path, bbox):
         """
