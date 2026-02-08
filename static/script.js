@@ -272,6 +272,10 @@ async function loadImage(index) {
     updateAnnotationsList();
     updatePredictionsList();
 
+    // Redraw canvas now that annotations and predictions are loaded
+    // (img.onload may have already fired from cache/preload with empty predictions)
+    drawCanvas();
+
     // Preload next image
     preloadNext(index + 1);
 }
