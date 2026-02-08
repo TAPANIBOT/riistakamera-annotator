@@ -60,7 +60,7 @@ def gmail_api_call(action, params=None):
     resp = requests.post(
         f'{GMAIL_AGENT_URL}/execute',
         json={'action': action, 'params': params or {}},
-        timeout=30,
+        timeout=180,
     )
     resp.raise_for_status()
     return resp.json()

@@ -497,7 +497,7 @@ function drawCanvas() {
 
         // Species label
         const species = pred.species;
-        const speciesLabel = species ? (SPECIES_LABELS[species] || species) : 'Eläin (laji tunnistamatta)';
+        const speciesLabel = species ? (SPECIES_LABELS[species] || species) : 'Eläin';
         const conf = pred.species_confidence
             ? Math.round(pred.species_confidence * 100)
             : pred.md_confidence
