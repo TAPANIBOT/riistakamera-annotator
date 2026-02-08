@@ -50,6 +50,39 @@ def get_image_files():
     return images
 
 
+def get_filtered_images(filter_type):
+    """Suodata kuvat tyypin mukaan."""
+    all_images = get_image_files()
+    if filter_type == 'all':
+        return all_images
+
+    result = []
+    for img_name in all_images:
+        ann_path = get_annotation_path(img_name)
+        pred_path = get_prediction_path(img_name)
+
+        has_annotation = False
+        is_empty = False
+        if ann_path.exists():
+            with open(ann_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            is_empty = data.get('is_empty', False)
+            has_annotation = bool(data.get('annotations')) or is_empty
+
+        has_prediction = pred_path.exists()
+
+        if filter_type == 'annotated' and has_annotation:
+            result.append(img_name)
+        elif filter_type == 'unannotated' and not has_annotation:
+            result.append(img_name)
+        elif filter_type == 'predicted' and has_prediction and not has_annotation:
+            result.append(img_name)
+        elif filter_type == 'empty' and is_empty:
+            result.append(img_name)
+
+    return result
+
+
 def get_annotation_path(image_name):
     """Palauta annotaatiotiedoston polku."""
     base = Path(image_name).stem
@@ -71,8 +104,11 @@ def index():
 
 @app.route('/api/images')
 def list_images():
-    images = get_image_files()
-    return jsonify({'images': images, 'total': len(images)})
+    filter_type = request.args.get('filter', 'all')
+    if filter_type not in ('all', 'annotated', 'unannotated', 'predicted', 'empty'):
+        filter_type = 'all'
+    images = get_filtered_images(filter_type)
+    return jsonify({'images': images, 'total': len(images), 'filter': filter_type})
 
 
 @app.route('/api/image/<path:filename>')

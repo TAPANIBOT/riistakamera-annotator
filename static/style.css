@@ -661,6 +661,34 @@ body {
 .prediction-card__conf--med  { color: var(--accent-orange); }
 .prediction-card__conf--low  { color: var(--text-muted); }
 
+.species-override {
+    width: 100%;
+    padding: 3px 6px;
+    font-family: 'Sora', sans-serif;
+    font-size: 11px;
+    background: var(--bg-overlay);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    cursor: pointer;
+    margin-bottom: 4px;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235a6b82'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+    padding-right: 20px;
+}
+
+.species-override:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+}
+
+.species-override option {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+}
+
 .prediction-card__bbox {
     font-family: 'Space Mono', monospace;
     font-size: 10px;

@@ -124,8 +124,19 @@ async function init() {
     // Session timer
     session.timerInterval = setInterval(updateSessionTimer, 1000);
 
+    // Check if we should default to 'predicted' filter
+    try {
+        const statsResp = await fetch('/api/stats');
+        const stats = await statsResp.json();
+        state.stats = stats;
+        if (stats.predicted_images > 0 && stats.annotated_images === 0 && stats.empty_images === 0) {
+            state.filter = 'predicted';
+            document.getElementById('filter-select').value = 'predicted';
+        }
+    } catch {}
+
     await loadImages();
-    await loadStats();
+    updateProgress();
 }
 
 // ===================== KEYBOARD =====================
@@ -186,7 +197,17 @@ function handleKeyboard(e) {
     const num = parseInt(e.key);
     if (num >= 1 && num <= 9) {
         const species = Object.values(CLASS_MAP)[num - 1];
-        if (species) selectSpecies(species);
+        if (!species) return;
+        // If a prediction is focused, change its species dropdown
+        if (state.focusedPrediction >= 0) {
+            const selectEl = document.querySelector(`.species-override[data-pred-index="${state.focusedPrediction}"]`);
+            if (selectEl) {
+                selectEl.value = species;
+                showStatus(`Laji: ${SPECIES_LABELS[species]}`, 'success');
+            }
+        } else {
+            selectSpecies(species);
+        }
         return;
     }
 
@@ -208,13 +229,19 @@ function selectSpecies(species) {
 
 async function loadImages() {
     try {
-        const resp = await fetch('/api/images');
+        const filterParam = state.filter !== 'all' ? `?filter=${state.filter}` : '';
+        const resp = await fetch(`/api/images${filterParam}`);
         const data = await resp.json();
         state.images = data.images || [];
 
         document.getElementById('loading').style.display = 'none';
+        document.getElementById('no-images').style.display = 'none';
 
         if (state.images.length === 0) {
+            document.getElementById('no-images').textContent =
+                state.filter !== 'all'
+                    ? 'Ei kuvia tällä suodattimella. Kaikki annotoitu!'
+                    : 'Ei kuvia kansiossa. Lisää kuvia /data/images/incoming/ -hakemistoon.';
             document.getElementById('no-images').style.display = 'block';
             return;
         }
@@ -337,6 +364,37 @@ function updateSessionTimer() {
 }
 
 // ===================== NAVIGATION =====================
+
+async function advanceAfterSave() {
+    if (!state.autoAdvance) return;
+
+    if (state.filter !== 'all') {
+        // Re-fetch filtered list — the just-annotated image should drop off
+        const currentName = state.images[state.currentIndex];
+        const filterParam = `?filter=${state.filter}`;
+        try {
+            const resp = await fetch(`/api/images${filterParam}`);
+            const data = await resp.json();
+            state.images = data.images || [];
+
+            if (state.images.length === 0) {
+                document.getElementById('no-images').textContent = 'Kaikki kuvat annotoitu!';
+                document.getElementById('no-images').style.display = 'block';
+                updateProgress();
+                return;
+            }
+
+            // Stay at same index (next image slides into current position)
+            const newIndex = Math.min(state.currentIndex, state.images.length - 1);
+            setTimeout(() => loadImage(newIndex), 300);
+        } catch {
+            // Fallback to simple next
+            setTimeout(() => nextImage(), 400);
+        }
+    } else {
+        setTimeout(() => nextImage(), 400);
+    }
+}
 
 function nextImage() {
     if (state.currentIndex < state.images.length - 1) {
@@ -626,12 +684,7 @@ function saveCurrentAnnotation() {
 
     showStatus(`Tallennettu: ${SPECIES_LABELS[species]}`, 'success');
 
-    // Auto-advance
-    if (state.autoAdvance) {
-        setTimeout(() => nextImage(), 400);
-    }
-
-    // Refresh stats
+    advanceAfterSave();
     loadStats();
 }
 
@@ -678,9 +731,7 @@ function markAsEmpty() {
     session.annotatedCount++;
     showStatus('Merkitty tyhjäksi kuvaksi', 'success');
 
-    if (state.autoAdvance) {
-        setTimeout(() => nextImage(), 400);
-    }
+    advanceAfterSave();
     loadStats();
 }
 
@@ -692,12 +743,16 @@ function acceptPrediction(index) {
     const pred = state.predictions[index];
     pushHistory();
 
-    const species = pred.species || 'muu';
+    const selectEl = document.querySelector(`.species-override[data-pred-index="${index}"]`);
+    const species = selectEl ? selectEl.value : (pred.species || 'muu');
+    const originalSpecies = pred.species || 'muu';
+
     state.annotations.push({
         bbox: pred.bbox.map(Math.round),
         species: species,
         timestamp: new Date().toISOString(),
         from_prediction: true,
+        original_species: originalSpecies,
         md_confidence: pred.md_confidence,
         species_confidence: pred.species_confidence
     });
@@ -730,13 +785,16 @@ function acceptAllPredictions() {
     if (state.predictions.length === 0) return;
     pushHistory();
 
-    state.predictions.forEach(pred => {
-        const species = pred.species || 'muu';
+    state.predictions.forEach((pred, idx) => {
+        const selectEl = document.querySelector(`.species-override[data-pred-index="${idx}"]`);
+        const species = selectEl ? selectEl.value : (pred.species || 'muu');
+        const originalSpecies = pred.species || 'muu';
         state.annotations.push({
             bbox: pred.bbox.map(Math.round),
             species: species,
             timestamp: new Date().toISOString(),
             from_prediction: true,
+            original_species: originalSpecies,
             md_confidence: pred.md_confidence,
             species_confidence: pred.species_confidence
         });
@@ -754,9 +812,7 @@ function acceptAllPredictions() {
     session.annotatedCount += count;
     showStatus(`Hyväksytty ${count} ennustetta`, 'success');
 
-    if (state.autoAdvance) {
-        setTimeout(() => nextImage(), 400);
-    }
+    advanceAfterSave();
     loadStats();
 }
 
@@ -796,6 +852,13 @@ function updateAnnotationsList() {
     });
 }
 
+function buildSpeciesOptions(selectedSpecies) {
+    return Object.entries(SPECIES_LABELS).map(([key, label]) => {
+        const sel = key === selectedSpecies ? ' selected' : '';
+        return `<option value="${key}"${sel}>${label}</option>`;
+    }).join('');
+}
+
 function updatePredictionsList() {
     const container = document.getElementById('predictions-list');
     if (!container) return;
@@ -807,7 +870,7 @@ function updatePredictionsList() {
 
     container.innerHTML = '';
     state.predictions.forEach((pred, idx) => {
-        const species = pred.species || 'Eläin';
+        const species = pred.species || 'muu';
         const label = SPECIES_LABELS[species] || species;
         const conf = pred.species_confidence
             ? Math.round(pred.species_confidence * 100)
@@ -831,6 +894,9 @@ function updatePredictionsList() {
                 <span class="prediction-card__species">${label}</span>
                 ${conf !== null ? `<span class="prediction-card__conf ${confClass}">${conf}%</span>` : ''}
             </div>
+            <select class="species-override" data-pred-index="${idx}">
+                ${buildSpeciesOptions(species)}
+            </select>
             <div class="prediction-card__bbox">[${pred.bbox.map(Math.round).join(', ')}]</div>
             <div class="prediction-card__actions">
                 <button class="btn-accept" onclick="acceptPrediction(${idx})" title="Hyväksy (A)">Hyväksy</button>
