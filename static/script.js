@@ -172,21 +172,12 @@ function handleKeyboard(e) {
         return;
     }
 
-    // Number keys 1-9
+    // Number keys 1-9: select species (auto-accepts predictions if any)
     const num = parseInt(e.key);
     if (num >= 1 && num <= 9) {
         const species = Object.values(CLASS_MAP)[num - 1];
         if (!species) return;
-        // If predictions exist and override dropdown is visible, change the override
-        if (state.predictions.length > 0) {
-            const overrideEl = document.getElementById('pred-override');
-            if (overrideEl) {
-                overrideEl.value = species;
-                updatePredictionBadgeSpecies(species);
-            }
-        } else {
-            selectSpecies(species);
-        }
+        selectSpecies(species);
         return;
     }
 
@@ -202,6 +193,13 @@ function selectSpecies(species) {
     document.querySelectorAll('.sp-pill[data-species]').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.species === species);
     });
+
+    // If predictions exist, override species and accept all immediately
+    if (state.predictions.length > 0) {
+        const overrideEl = document.getElementById('pred-override');
+        if (overrideEl) overrideEl.value = species;
+        acceptAllPredictions();
+    }
 }
 
 // ===================== IMAGE LOADING =====================
