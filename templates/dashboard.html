@@ -31,116 +31,227 @@
         <div class="dash-filters__row">
             <div class="dash-filters__dates">
                 <label class="dash-filter-label">Aikajakso</label>
+                <div class="dash-quick-dates">
+                    <button class="dash-btn dash-btn--quick" data-range="today">Tänään</button>
+                    <button class="dash-btn dash-btn--quick" data-range="7">7 pv</button>
+                    <button class="dash-btn dash-btn--quick" data-range="30">30 pv</button>
+                </div>
                 <input type="date" id="filter-from" class="dash-date-input" title="Alkaen">
                 <span class="dash-filter-sep">—</span>
                 <input type="date" id="filter-to" class="dash-date-input" title="Saakka">
             </div>
             <div class="dash-filters__species" id="species-chips"></div>
             <div class="dash-filters__actions">
-                <button class="dash-btn dash-btn--primary" id="btn-refresh" title="Päivitä">Päivitä</button>
                 <button class="dash-btn" id="btn-reset" title="Nollaa suodattimet">Nollaa</button>
             </div>
         </div>
     </section>
 
+    <!-- TABS -->
+    <nav class="dash-tabs" id="dash-tabs">
+        <button class="dash-tab active" data-view="overview">Yleiskatsaus</button>
+        <button class="dash-tab" data-view="table">Taulukko</button>
+        <button class="dash-tab" data-view="gallery">Galleria</button>
+    </nav>
+
+    <!-- LOADING OVERLAY -->
+    <div class="dash-loading" id="dash-loading">
+        <div class="dash-spinner"></div>
+        <span>Ladataan tietoja…</span>
+    </div>
+
+    <!-- ERROR TOAST -->
+    <div class="dash-error" id="dash-error">
+        <span>Tietojen lataus epäonnistui</span>
+        <button class="dash-error__retry" id="btn-error-retry">Yritä uudelleen</button>
+    </div>
+
     <!-- SCROLLABLE CONTENT -->
     <div class="dash-scroll">
 
-        <!-- KPI CARDS -->
-        <div class="dash-kpi-grid">
-            <div class="dash-kpi">
-                <div class="dash-kpi__value" id="kpi-total">—</div>
-                <div class="dash-kpi__label">Kuvia yhteensä</div>
-            </div>
-            <div class="dash-kpi">
-                <div class="dash-kpi__value" id="kpi-annotated">—</div>
-                <div class="dash-kpi__label">Annotoitu</div>
-            </div>
-            <div class="dash-kpi">
-                <div class="dash-kpi__value" id="kpi-empty">—</div>
-                <div class="dash-kpi__label">Tyhjiä kuvia</div>
-            </div>
-            <div class="dash-kpi">
-                <div class="dash-kpi__value" id="kpi-species">—</div>
-                <div class="dash-kpi__label">Eri lajeja</div>
-            </div>
-            <div class="dash-kpi">
-                <div class="dash-kpi__value" id="kpi-annotations">—</div>
-                <div class="dash-kpi__label">Havaintoja</div>
-            </div>
-            <div class="dash-kpi">
-                <div class="dash-kpi__value" id="kpi-accuracy">—</div>
-                <div class="dash-kpi__label">AI-tarkkuus</div>
-            </div>
-        </div>
+        <!-- ============ OVERVIEW VIEW ============ -->
+        <div class="dash-view" id="view-overview">
 
-        <!-- ROW 1: Species + Hourly -->
-        <div class="dash-grid-2">
-            <div class="dash-card">
-                <div class="dash-card__header">
-                    <h3>Lajien jakauma</h3>
+            <!-- KPI CARDS -->
+            <div class="dash-kpi-grid">
+                <div class="dash-kpi">
+                    <div class="dash-kpi__value" id="kpi-total">—</div>
+                    <div class="dash-kpi__label">Kuvia yhteensä</div>
                 </div>
-                <div class="dash-card__body dash-card__body--chart">
-                    <canvas id="chart-species"></canvas>
+                <div class="dash-kpi">
+                    <div class="dash-kpi__value" id="kpi-annotated">—</div>
+                    <div class="dash-kpi__label">Annotoitu</div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi__value" id="kpi-empty">—</div>
+                    <div class="dash-kpi__label">Tyhjiä kuvia</div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi__value" id="kpi-species">—</div>
+                    <div class="dash-kpi__label">Eri lajeja</div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi__value" id="kpi-annotations">—</div>
+                    <div class="dash-kpi__label">Havaintoja</div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi__value" id="kpi-accuracy">—</div>
+                    <div class="dash-kpi__label">AI-tarkkuus</div>
                 </div>
             </div>
-            <div class="dash-card">
-                <div class="dash-card__header">
-                    <h3>Vuorokausirytmi</h3>
-                    <span class="dash-card__hint">Milloin eläimet liikkuvat</span>
-                </div>
-                <div class="dash-card__body dash-card__body--chart">
-                    <canvas id="chart-hourly"></canvas>
-                </div>
-            </div>
-        </div>
 
-        <!-- ROW 2: Calendar + AI Accuracy -->
-        <div class="dash-grid-2">
-            <div class="dash-card">
-                <div class="dash-card__header">
-                    <h3>Havaintokalenteri</h3>
-                    <span class="dash-card__hint">Päivittäiset havainnot</span>
+            <!-- ROW 1: Species + Hourly -->
+            <div class="dash-grid-2">
+                <div class="dash-card">
+                    <div class="dash-card__header">
+                        <h3>Lajien jakauma</h3>
+                    </div>
+                    <div class="dash-card__body dash-card__body--chart">
+                        <canvas id="chart-species"></canvas>
+                    </div>
                 </div>
-                <div class="dash-card__body dash-card__body--chart">
-                    <canvas id="chart-calendar"></canvas>
+                <div class="dash-card">
+                    <div class="dash-card__header">
+                        <h3>Vuorokausirytmi</h3>
+                        <span class="dash-card__hint">Milloin eläimet liikkuvat</span>
+                    </div>
+                    <div class="dash-card__body dash-card__body--chart">
+                        <canvas id="chart-hourly"></canvas>
+                    </div>
                 </div>
             </div>
-            <div class="dash-card">
-                <div class="dash-card__header">
-                    <h3>AI-mallin suorituskyky</h3>
-                    <span class="dash-card__hint">Ihminen vs. AI per laji</span>
-                </div>
-                <div class="dash-card__body dash-card__body--chart">
-                    <canvas id="chart-ai"></canvas>
-                </div>
-            </div>
-        </div>
 
-        <!-- ROW 3: Confidence -->
-        <div class="dash-grid-1">
+            <!-- ROW 2: Calendar + AI Accuracy -->
+            <div class="dash-grid-2">
+                <div class="dash-card">
+                    <div class="dash-card__header">
+                        <h3>Havaintokalenteri</h3>
+                        <span class="dash-card__hint">Klikkaa datapistettä avataksesi päivänäkymän</span>
+                    </div>
+                    <div class="dash-card__body dash-card__body--chart">
+                        <canvas id="chart-calendar"></canvas>
+                    </div>
+                </div>
+                <div class="dash-card">
+                    <div class="dash-card__header">
+                        <h3>AI-mallin suorituskyky</h3>
+                        <span class="dash-card__hint">Ihminen vs. AI per laji</span>
+                    </div>
+                    <div class="dash-card__body dash-card__body--chart">
+                        <canvas id="chart-ai"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ROW 3: Confidence -->
+            <div class="dash-grid-1">
+                <div class="dash-card">
+                    <div class="dash-card__header">
+                        <h3>Luottamusjakauma</h3>
+                        <span class="dash-card__hint">AI-ennusteiden varmuus</span>
+                    </div>
+                    <div class="dash-card__body dash-card__body--chart dash-card__body--short">
+                        <canvas id="chart-confidence"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RECENT FEED -->
             <div class="dash-card">
                 <div class="dash-card__header">
-                    <h3>Luottamusjakauma</h3>
-                    <span class="dash-card__hint">AI-ennusteiden varmuus</span>
+                    <h3>Viimeisimmät havainnot</h3>
                 </div>
-                <div class="dash-card__body dash-card__body--chart dash-card__body--short">
-                    <canvas id="chart-confidence"></canvas>
+                <div class="dash-card__body">
+                    <div class="dash-feed" id="recent-feed"></div>
                 </div>
             </div>
-        </div>
 
-        <!-- RECENT FEED -->
-        <div class="dash-card">
-            <div class="dash-card__header">
-                <h3>Viimeisimmät havainnot</h3>
+        </div><!-- /view-overview -->
+
+        <!-- ============ TABLE VIEW ============ -->
+        <div class="dash-view" id="view-table" style="display:none">
+            <div class="dash-card">
+                <div class="dash-card__header">
+                    <h3>Havaintotaulukko</h3>
+                    <span class="dash-card__hint" id="table-count"></span>
+                </div>
+                <div class="dash-card__body">
+                    <div class="dash-table-wrap">
+                        <table class="dash-table" id="obs-table">
+                            <thead>
+                                <tr>
+                                    <th data-sort="image">Kuva</th>
+                                    <th data-sort="species" class="sortable">Laji</th>
+                                    <th data-sort="date" class="sortable sort-active sort-desc">Päivä</th>
+                                    <th data-sort="hour" class="sortable">Kello</th>
+                                    <th data-sort="confidence" class="sortable">Luottamus</th>
+                                    <th data-sort="source" class="sortable">AI/Ihminen</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="dash-pagination" id="table-pagination"></div>
+                </div>
             </div>
-            <div class="dash-card__body">
-                <div class="dash-feed" id="recent-feed"></div>
+        </div><!-- /view-table -->
+
+        <!-- ============ GALLERY VIEW ============ -->
+        <div class="dash-view" id="view-gallery" style="display:none">
+            <div class="dash-gallery-toolbar">
+                <select id="gallery-sort" class="dash-select">
+                    <option value="date_desc">Uusin ensin</option>
+                    <option value="date_asc">Vanhin ensin</option>
+                    <option value="confidence_desc">Korkein luottamus</option>
+                    <option value="confidence_asc">Matalin luottamus</option>
+                </select>
+                <span class="dash-card__hint" id="gallery-count"></span>
             </div>
-        </div>
+            <div class="dash-gallery-grid" id="gallery-grid"></div>
+            <div class="dash-pagination" id="gallery-pagination"></div>
+        </div><!-- /view-gallery -->
+
+        <!-- ============ DAY VIEW ============ -->
+        <div class="dash-view" id="view-day" style="display:none">
+            <div class="dash-day-header">
+                <button class="dash-btn" id="day-back">&larr; Takaisin</button>
+                <h2 id="day-title"></h2>
+            </div>
+            <div class="dash-kpi-grid dash-kpi-grid--mini" id="day-kpis"></div>
+            <div class="dash-grid-2">
+                <div class="dash-card">
+                    <div class="dash-card__header"><h3>Tunnittain</h3></div>
+                    <div class="dash-card__body dash-card__body--chart">
+                        <canvas id="chart-day-hourly"></canvas>
+                    </div>
+                </div>
+                <div class="dash-card">
+                    <div class="dash-card__header"><h3>Lajijakauma</h3></div>
+                    <div class="dash-card__body dash-card__body--chart">
+                        <canvas id="chart-day-species"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-card__header"><h3>Päivän kuvat</h3></div>
+                <div class="dash-card__body">
+                    <div class="dash-gallery-grid" id="day-images"></div>
+                </div>
+            </div>
+        </div><!-- /view-day -->
 
     </div><!-- /dash-scroll -->
+
+    <!-- LIGHTBOX -->
+    <div class="dash-lightbox" id="lightbox">
+        <button class="dash-lightbox__close" id="lb-close">&times;</button>
+        <button class="dash-lightbox__nav dash-lightbox__prev" id="lb-prev">&lsaquo;</button>
+        <button class="dash-lightbox__nav dash-lightbox__next" id="lb-next">&rsaquo;</button>
+        <div class="dash-lightbox__content">
+            <img class="dash-lightbox__img" id="lb-img" alt="">
+            <div class="dash-lightbox__info" id="lb-info"></div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>

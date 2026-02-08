@@ -407,7 +407,7 @@ def dashboard_data():
 
     images = get_image_files()
 
-    total_images = len(images)
+    total_images = 0
     annotated_count = 0
     empty_count = 0
     unannotated_count = 0
@@ -429,6 +429,8 @@ def dashboard_data():
         if to_date and camera_date and camera_date > to_date:
             continue
 
+        total_images += 1
+
         ann_path = get_annotation_path(img_name)
         if not ann_path.exists():
             unannotated_count += 1
@@ -445,6 +447,12 @@ def dashboard_data():
         if not anns:
             unannotated_count += 1
             continue
+
+        # Check if any annotation matches species filter
+        if species_filter:
+            has_match = any(ann.get('species', 'muu') in species_filter for ann in anns)
+            if not has_match:
+                continue
 
         annotated_count += 1
 
@@ -520,6 +528,209 @@ def dashboard_data():
         'recent': recent,
         'species_labels': SPECIES_LABELS,
     })
+
+
+def _build_annotation_rows(from_date='', to_date='', species_filter=None):
+    """Build flat list of annotation rows for table/gallery views."""
+    images = get_image_files()
+    rows = []
+    for img_name in images:
+        camera_date, camera_hour = _parse_camera_datetime(img_name)
+        if from_date and camera_date and camera_date < from_date:
+            continue
+        if to_date and camera_date and camera_date > to_date:
+            continue
+
+        ann_path = get_annotation_path(img_name)
+        if not ann_path.exists():
+            continue
+        with open(ann_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if data.get('is_empty', False):
+            continue
+        anns = data.get('annotations', [])
+        if not anns:
+            continue
+
+        for ann in anns:
+            sp = ann.get('species', 'muu')
+            if species_filter and sp not in species_filter:
+                continue
+            rows.append({
+                'image': img_name,
+                'species': sp,
+                'species_label': SPECIES_LABELS.get(sp, sp),
+                'camera_date': camera_date,
+                'camera_hour': camera_hour,
+                'confidence': ann.get('species_confidence') or ann.get('md_confidence'),
+                'from_prediction': ann.get('from_prediction', False),
+                'original_species': ann.get('original_species', ''),
+            })
+    return rows
+
+
+@app.route('/api/dashboard/table')
+def dashboard_table():
+    """Paginated table data for observations."""
+    from_date = request.args.get('from_date', '')
+    to_date = request.args.get('to_date', '')
+    sp_param = request.args.get('species', '')
+    species_filter = {s.strip() for s in sp_param.split(',') if s.strip()} if sp_param else None
+    sort = request.args.get('sort', 'date_desc')
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+    per_page = min(per_page, 200)
+
+    rows = _build_annotation_rows(from_date, to_date, species_filter)
+
+    # Sort
+    sort_field, sort_dir = (sort.rsplit('_', 1) + ['desc'])[:2]
+    reverse = sort_dir == 'desc'
+    if sort_field == 'date':
+        rows.sort(key=lambda r: (r['camera_date'] or '', r['camera_hour'] or 0), reverse=reverse)
+    elif sort_field == 'species':
+        rows.sort(key=lambda r: r['species'], reverse=reverse)
+    elif sort_field == 'confidence':
+        rows.sort(key=lambda r: r['confidence'] or 0, reverse=reverse)
+    elif sort_field == 'hour':
+        rows.sort(key=lambda r: r['camera_hour'] or 0, reverse=reverse)
+    elif sort_field == 'source':
+        rows.sort(key=lambda r: r['from_prediction'], reverse=reverse)
+    else:
+        rows.sort(key=lambda r: (r['camera_date'] or '', r['camera_hour'] or 0), reverse=True)
+
+    total = len(rows)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * per_page
+    page_rows = rows[start:start + per_page]
+
+    return jsonify({
+        'rows': page_rows,
+        'total': total,
+        'page': page,
+        'total_pages': total_pages,
+    })
+
+
+@app.route('/api/dashboard/day')
+def dashboard_day():
+    """Day-specific analytics data."""
+    date = request.args.get('date', '')
+    if not date:
+        return jsonify({'error': 'date parameter required'}), 400
+
+    images = get_image_files()
+    total_annotations = 0
+    species_counts = {}
+    hourly_breakdown = {}
+    day_images = []
+
+    for img_name in images:
+        camera_date, camera_hour = _parse_camera_datetime(img_name)
+        if camera_date != date:
+            continue
+
+        ann_path = get_annotation_path(img_name)
+        if not ann_path.exists():
+            continue
+        with open(ann_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if data.get('is_empty', False):
+            continue
+        anns = data.get('annotations', [])
+        if not anns:
+            continue
+
+        for ann in anns:
+            sp = ann.get('species', 'muu')
+            total_annotations += 1
+            species_counts[sp] = species_counts.get(sp, 0) + 1
+
+            if camera_hour is not None:
+                h_key = str(camera_hour)
+                if h_key not in hourly_breakdown:
+                    hourly_breakdown[h_key] = {}
+                hourly_breakdown[h_key][sp] = hourly_breakdown[h_key].get(sp, 0) + 1
+
+            day_images.append({
+                'image': img_name,
+                'species': sp,
+                'species_label': SPECIES_LABELS.get(sp, sp),
+                'camera_hour': camera_hour,
+                'confidence': ann.get('species_confidence') or ann.get('md_confidence'),
+            })
+
+    unique_images = len({img['image'] for img in day_images})
+
+    return jsonify({
+        'date': date,
+        'total_annotations': total_annotations,
+        'unique_images': unique_images,
+        'species_counts': species_counts,
+        'hourly_breakdown': hourly_breakdown,
+        'images': day_images,
+        'species_labels': SPECIES_LABELS,
+    })
+
+
+@app.route('/api/gallery')
+def gallery_data():
+    """Paginated gallery data."""
+    from_date = request.args.get('from_date', '')
+    to_date = request.args.get('to_date', '')
+    sp_param = request.args.get('species', '')
+    species_filter = {s.strip() for s in sp_param.split(',') if s.strip()} if sp_param else None
+    sort = request.args.get('sort', 'date_desc')
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 24, type=int)
+    per_page = min(per_page, 100)
+
+    rows = _build_annotation_rows(from_date, to_date, species_filter)
+
+    # Sort
+    sort_field, sort_dir = (sort.rsplit('_', 1) + ['desc'])[:2]
+    reverse = sort_dir == 'desc'
+    if sort_field == 'date':
+        rows.sort(key=lambda r: (r['camera_date'] or '', r['camera_hour'] or 0), reverse=reverse)
+    elif sort_field == 'confidence':
+        rows.sort(key=lambda r: r['confidence'] or 0, reverse=reverse)
+    else:
+        rows.sort(key=lambda r: (r['camera_date'] or '', r['camera_hour'] or 0), reverse=True)
+
+    total = len(rows)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * per_page
+    page_rows = rows[start:start + per_page]
+
+    return jsonify({
+        'images': page_rows,
+        'total': total,
+        'page': page,
+        'total_pages': total_pages,
+    })
+
+
+THUMBNAIL_DIR = DATA_DIR / 'thumbnails'
+
+
+@app.route('/api/thumbnail/<path:filename>')
+def get_thumbnail(filename):
+    """Serve 300px-wide thumbnail, generate and cache if needed."""
+    THUMBNAIL_DIR.mkdir(parents=True, exist_ok=True)
+    thumb_path = THUMBNAIL_DIR / filename
+    if not thumb_path.exists():
+        src_path = IMAGE_DIR / filename
+        if not src_path.exists():
+            return jsonify({'error': 'Image not found'}), 404
+        try:
+            with Image.open(src_path) as img:
+                img.thumbnail((300, 300))
+                img.save(thumb_path, 'JPEG', quality=80)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    return send_from_directory(THUMBNAIL_DIR, filename)
 
 
 @app.route('/api/status')
