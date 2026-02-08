@@ -1,0 +1,28 @@
+services:
+  wildlife-detector:
+    build: .
+    container_name: wildlife-detector
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:5000:5000"
+    volumes:
+      - wildlife-data:/data
+    environment:
+      - DATA_DIR=/data
+      - IMAGE_DIR=/data/images/incoming
+      - ANNOTATION_DIR=/data/annotations
+      - PREDICTION_DIR=/data/predictions
+      - GMAIL_AGENT_URL=http://gmail-agent:8001
+      - FETCH_INTERVAL_SECONDS=1800
+    networks:
+      - agent-network
+    mem_limit: 2g
+    cpus: 2.0
+
+volumes:
+  wildlife-data:
+    driver: local
+
+networks:
+  agent-network:
+    external: true

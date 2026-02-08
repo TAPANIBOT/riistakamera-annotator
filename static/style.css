@@ -7,51 +7,59 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #1a1a2e;
     min-height: 100vh;
     padding: 20px;
+    color: #333;
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     background: white;
     border-radius: 12px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-    padding: 30px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    padding: 24px;
 }
 
 header {
     text-align: center;
-    margin-bottom: 30px;
-    border-bottom: 2px solid #667eea;
-    padding-bottom: 20px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #2d5016;
+    padding-bottom: 16px;
 }
 
 h1 {
-    color: #333;
-    font-size: 2.5em;
-    margin-bottom: 10px;
+    color: #2d5016;
+    font-size: 2em;
+    margin-bottom: 8px;
 }
 
 .stats {
     display: flex;
     justify-content: center;
-    gap: 30px;
-    margin-top: 15px;
-    font-size: 1.1em;
+    gap: 24px;
+    font-size: 0.95em;
     color: #666;
+    flex-wrap: wrap;
 }
 
+.stats span {
+    background: #f0f0f0;
+    padding: 4px 12px;
+    border-radius: 4px;
+}
+
+/* Canvas */
 .canvas-container {
     position: relative;
     width: 100%;
-    background: #f5f5f5;
-    border: 2px solid #ddd;
+    background: #1a1a1a;
+    border: 2px solid #333;
     border-radius: 8px;
     overflow: hidden;
-    margin-bottom: 20px;
-    min-height: 500px;
+    margin-bottom: 16px;
+    min-height: 400px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -65,65 +73,92 @@ h1 {
 
 #loading, #no-images {
     position: absolute;
-    font-size: 1.5em;
+    font-size: 1.3em;
     color: #999;
 }
 
+/* Status message */
+.status-message {
+    padding: 10px 16px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.status-success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-warning {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+}
+
+.status-error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Controls */
 .controls {
     display: flex;
-    gap: 20px;
+    gap: 16px;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
     flex-wrap: wrap;
 }
 
 .control-group {
     display: flex;
     align-items: center;
-    gap: 10px;
-    flex: 1;
+    gap: 8px;
 }
 
 .control-group label {
     font-weight: 600;
     color: #555;
+    white-space: nowrap;
 }
 
-#species-select {
-    flex: 1;
-    padding: 10px 15px;
-    font-size: 1em;
+#species-select, #filter-select {
+    padding: 8px 12px;
+    font-size: 0.95em;
     border: 2px solid #ddd;
     border-radius: 6px;
     background: white;
     cursor: pointer;
-    transition: border-color 0.3s;
 }
 
-#species-select:focus {
+#species-select:focus, #filter-select:focus {
     outline: none;
-    border-color: #667eea;
+    border-color: #2d5016;
 }
 
 .button-group {
     display: flex;
-    gap: 10px;
+    gap: 8px;
+    margin-left: auto;
 }
 
 .btn {
-    padding: 12px 24px;
-    font-size: 1em;
+    padding: 10px 20px;
+    font-size: 0.95em;
     font-weight: 600;
     border: none;
     border-radius: 6px;
     cursor: pointer;
-    transition: all 0.3s;
+    transition: all 0.2s;
     white-space: nowrap;
 }
 
 .btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .btn:active {
@@ -131,12 +166,12 @@ h1 {
 }
 
 .btn-primary {
-    background: #667eea;
+    background: #2d5016;
     color: white;
 }
 
 .btn-primary:hover {
-    background: #5568d3;
+    background: #3d6a20;
 }
 
 .btn-success {
@@ -157,17 +192,52 @@ h1 {
     background: #dd6b20;
 }
 
-.annotations-list {
+.btn-secondary {
+    background: #718096;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #5a6b7f;
+}
+
+.btn-empty {
+    background: #a0aec0;
+    color: white;
+}
+
+.btn-empty:hover {
+    background: #718096;
+}
+
+.btn-uncertain {
+    background: #9f7aea;
+    color: white;
+}
+
+.btn-uncertain:hover {
+    background: #805ad5;
+}
+
+/* Side panels */
+.side-panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.annotations-list, .predictions-panel {
     background: #f9f9f9;
     border: 1px solid #ddd;
     border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 20px;
+    padding: 16px;
 }
 
-.annotations-list h3 {
+.annotations-list h3, .predictions-panel h3 {
     color: #333;
-    margin-bottom: 15px;
+    margin-bottom: 12px;
+    font-size: 1em;
 }
 
 #annotations-ul {
@@ -176,76 +246,161 @@ h1 {
 
 #annotations-ul li {
     background: white;
-    padding: 10px 15px;
-    margin-bottom: 8px;
+    padding: 8px 12px;
+    margin-bottom: 6px;
     border-radius: 6px;
-    border-left: 4px solid #667eea;
+    border-left: 4px solid #48bb78;
     display: flex;
     justify-content: space-between;
     align-items: center;
-}
-
-#annotations-ul li .delete-btn {
-    background: #fc8181;
-    color: white;
-    border: none;
-    padding: 5px 12px;
-    border-radius: 4px;
-    cursor: pointer;
     font-size: 0.9em;
 }
 
-#annotations-ul li .delete-btn:hover {
+.bbox-info {
+    color: #999;
+    font-size: 0.8em;
+    margin-left: 8px;
+}
+
+.delete-btn {
+    background: #fc8181;
+    color: white;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+}
+
+.delete-btn:hover {
     background: #f56565;
 }
 
+/* Predictions */
+.prediction-item {
+    background: white;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    border-radius: 6px;
+    border-left: 4px solid #ed8936;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9em;
+}
+
+.pred-label {
+    font-weight: 600;
+    flex: 1;
+}
+
+.confidence-badge {
+    background: #ed8936;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: 600;
+}
+
+.pred-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.btn-accept {
+    background: #48bb78;
+    color: white;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+}
+
+.btn-accept:hover {
+    background: #38a169;
+}
+
+.btn-reject {
+    background: #fc8181;
+    color: white;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+}
+
+.btn-reject:hover {
+    background: #f56565;
+}
+
+.no-predictions {
+    color: #999;
+    font-style: italic;
+    font-size: 0.9em;
+}
+
+/* Instructions */
 .instructions {
-    background: #e6f7ff;
-    border: 1px solid #91d5ff;
+    background: #f0f7e6;
+    border: 1px solid #c6dba0;
     border-radius: 8px;
-    padding: 20px;
+    padding: 16px;
 }
 
 .instructions h4 {
-    color: #0050b3;
+    color: #2d5016;
     margin-bottom: 10px;
 }
 
-.instructions ol {
-    margin-left: 20px;
-    margin-bottom: 10px;
-    color: #333;
+.shortcuts-grid {
+    display: grid;
+    grid-template-columns: auto 1fr auto 1fr;
+    gap: 6px 12px;
+    font-size: 0.9em;
 }
 
-.instructions li {
-    margin-bottom: 5px;
-}
-
-.instructions p {
-    color: #0050b3;
+.key {
+    background: #e2e8f0;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.85em;
     font-weight: 600;
+    text-align: center;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
     .container {
-        padding: 15px;
+        padding: 12px;
     }
-    
+
     h1 {
-        font-size: 1.8em;
+        font-size: 1.5em;
     }
-    
+
     .controls {
         flex-direction: column;
         align-items: stretch;
     }
-    
+
     .button-group {
+        margin-left: 0;
         flex-direction: column;
     }
-    
+
     .btn {
         width: 100%;
+    }
+
+    .side-panels {
+        grid-template-columns: 1fr;
+    }
+
+    .shortcuts-grid {
+        grid-template-columns: auto 1fr;
     }
 }

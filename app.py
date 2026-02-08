@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Riistakamera Annotator - Flask backend
-Kuvien lataus, annotaatioiden tallennus
+Kuvien lataus, annotaatioiden tallennus, AI-ennusteet, YOLO-eksportti
 """
 import os
 import json
@@ -11,74 +11,115 @@ from PIL import Image
 
 app = Flask(__name__)
 
-# Kuvakansio (voi muuttaa tarvittaessa)
-IMAGE_DIR = Path.home() / "clawd" / "riistakamera"
+# Konfiguraatio ympäristömuuttujista
+DATA_DIR = Path(os.environ.get('DATA_DIR', '/data'))
+IMAGE_DIR = Path(os.environ.get('IMAGE_DIR', str(DATA_DIR / 'images' / 'incoming')))
+ANNOTATION_DIR = Path(os.environ.get('ANNOTATION_DIR', str(DATA_DIR / 'annotations')))
+PREDICTION_DIR = Path(os.environ.get('PREDICTION_DIR', str(DATA_DIR / 'predictions')))
 ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.gif'}
+
+CLASS_MAP = {
+    0: 'kauris',
+    1: 'peura',
+    2: 'janis',
+    3: 'linnut',
+    4: 'supikoira',
+    5: 'kettu',
+    6: 'ihminen',
+    7: 'koira',
+    8: 'muu',
+}
+
+SPECIES_TO_ID = {v: k for k, v in CLASS_MAP.items()}
+
+
+def ensure_dirs():
+    """Luo tarvittavat hakemistot."""
+    for d in [IMAGE_DIR, ANNOTATION_DIR, PREDICTION_DIR]:
+        d.mkdir(parents=True, exist_ok=True)
+
 
 def get_image_files():
     """Hae kaikki kuvat kansiosta."""
     if not IMAGE_DIR.exists():
-        IMAGE_DIR.mkdir(parents=True, exist_ok=True)
         return []
-    
     images = []
     for f in sorted(IMAGE_DIR.iterdir()):
         if f.suffix.lower() in ALLOWED_EXTENSIONS:
             images.append(f.name)
     return images
 
+
 def get_annotation_path(image_name):
     """Palauta annotaatiotiedoston polku."""
-    base_name = Path(image_name).stem
-    return IMAGE_DIR / f"{base_name}.json"
+    base = Path(image_name).stem
+    return ANNOTATION_DIR / f"{base}.json"
+
+
+def get_prediction_path(image_name):
+    """Palauta ennustetiedoston polku."""
+    base = Path(image_name).stem
+    return PREDICTION_DIR / f"{base}.json"
+
+
+# ===================== ROUTES =====================
 
 @app.route('/')
 def index():
-    """Pääsivu."""
     return render_template('index.html')
+
 
 @app.route('/api/images')
 def list_images():
-    """Listaa kaikki kuvat."""
     images = get_image_files()
-    return jsonify({'images': images})
+    return jsonify({'images': images, 'total': len(images)})
+
 
 @app.route('/api/image/<path:filename>')
 def get_image(filename):
-    """Lataa kuva."""
     return send_from_directory(IMAGE_DIR, filename)
+
 
 @app.route('/api/annotation/<path:image_name>')
 def get_annotation(image_name):
-    """Hae annotaatio kuvalle."""
-    annotation_path = get_annotation_path(image_name)
-    
-    if annotation_path.exists():
-        with open(annotation_path, 'r', encoding='utf-8') as f:
+    path = get_annotation_path(image_name)
+    if path.exists():
+        with open(path, 'r', encoding='utf-8') as f:
             data = json.load(f)
         return jsonify(data)
-    else:
-        return jsonify({'image_name': image_name, 'annotations': []})
+    return jsonify({'image_name': image_name, 'annotations': [], 'is_empty': False})
+
 
 @app.route('/api/annotation/<path:image_name>', methods=['POST'])
 def save_annotation(image_name):
-    """Tallenna annotaatio."""
     data = request.get_json()
-    annotation_path = get_annotation_path(image_name)
-    
-    # Validoi data
-    if 'image_name' not in data or 'annotations' not in data:
-        return jsonify({'error': 'Invalid data format'}), 400
-    
-    # Tallenna JSON
-    with open(annotation_path, 'w', encoding='utf-8') as f:
+    if not data:
+        return jsonify({'error': 'Invalid data'}), 400
+
+    if 'annotations' not in data and 'is_empty' not in data:
+        return jsonify({'error': 'Must provide annotations or is_empty'}), 400
+
+    path = get_annotation_path(image_name)
+    data['image_name'] = image_name
+
+    with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
-    
-    return jsonify({'success': True, 'saved_to': str(annotation_path)})
+
+    return jsonify({'success': True})
+
+
+@app.route('/api/predictions/<path:image_name>')
+def get_predictions(image_name):
+    path = get_prediction_path(image_name)
+    if path.exists():
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return jsonify(data)
+    return jsonify({'image_name': image_name, 'predictions': []})
+
 
 @app.route('/api/image-info/<path:filename>')
 def get_image_info(filename):
-    """Hae kuvan dimensiot."""
     try:
         img_path = IMAGE_DIR / filename
         with Image.open(img_path) as img:
@@ -87,16 +128,153 @@ def get_image_info(filename):
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+
+@app.route('/api/stats')
+def get_stats():
+    """Tilastot: kuvien ja annotaatioiden määrä."""
+    images = get_image_files()
+    annotated = 0
+    empty_images = 0
+    total_annotations = 0
+    species_counts = {}
+
+    for img_name in images:
+        path = get_annotation_path(img_name)
+        if path.exists():
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if data.get('is_empty', False):
+                empty_images += 1
+                continue
+            anns = data.get('annotations', [])
+            if anns:
+                annotated += 1
+                total_annotations += len(anns)
+                for ann in anns:
+                    sp = ann.get('species', 'muu')
+                    species_counts[sp] = species_counts.get(sp, 0) + 1
+
+    predicted = 0
+    for img_name in images:
+        path = get_prediction_path(img_name)
+        if path.exists():
+            predicted += 1
+
+    return jsonify({
+        'total_images': len(images),
+        'annotated_images': annotated,
+        'empty_images': empty_images,
+        'unannotated_images': len(images) - annotated - empty_images,
+        'predicted_images': predicted,
+        'total_annotations': total_annotations,
+        'species_counts': species_counts,
+        'class_map': CLASS_MAP,
+    })
+
+
+@app.route('/api/active-learning/ranking')
+def active_learning_ranking():
+    """Palauta kuvat epävarmuusjärjestyksessä."""
+    from training.active_learning import get_uncertainty_ranking
+    limit = request.args.get('limit', 50, type=int)
+    ranking = get_uncertainty_ranking(limit=limit)
+    return jsonify({'ranking': ranking, 'total': len(ranking)})
+
+
+@app.route('/api/export/yolo', methods=['POST'])
+def export_yolo():
+    """Triggeroi YOLO-eksportin."""
+    try:
+        from export_yolo import export_dataset
+        result = export_dataset(
+            annotation_dir=str(ANNOTATION_DIR),
+            image_dir=str(IMAGE_DIR),
+            output_dir=str(DATA_DIR / 'dataset'),
+            class_map=CLASS_MAP,
+            species_to_id=SPECIES_TO_ID,
+        )
+        return jsonify(result)
+    except ImportError:
+        return jsonify({'error': 'export_yolo module not found'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/fetch', methods=['POST'])
+def fetch_images():
+    """Triggeroi sähköpostinouto + tunnistus."""
+    try:
+        from ingestion.fetch_camera_emails import fetch_camera_images
+        result = fetch_camera_images()
+        if result.get('new_images'):
+            from detection.detect_batch import detect_new_images
+            result['detection'] = detect_new_images()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/recent-detections')
+def recent_detections():
+    """Viimeisimmät tunnistukset Tapanin raportteihin."""
+    limit = request.args.get('limit', 20, type=int)
+
+    if not PREDICTION_DIR.exists():
+        return jsonify({'detections': [], 'species_summary': {}})
+
+    pred_files = sorted(
+        PREDICTION_DIR.glob('*.json'),
+        key=lambda f: f.stat().st_mtime,
+        reverse=True,
+    )[:limit]
+
+    detections = []
+    species_summary = {}
+
+    for pf in pred_files:
+        with open(pf, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        image_name = data.get('image', pf.stem)
+        preds = data.get('predictions', [])
+        for pred in preds:
+            sp = pred.get('species')
+            if sp:
+                species_summary[sp] = species_summary.get(sp, 0) + 1
+        detections.append({
+            'image': image_name,
+            'predictions_count': len(preds),
+            'species': [p.get('species') for p in preds if p.get('species')],
+        })
+
+    return jsonify({
+        'detections': detections,
+        'species_summary': species_summary,
+        'total': len(detections),
+    })
+
+
+@app.route('/api/status')
+def get_status():
+    """Palvelun tila."""
+    model_path = DATA_DIR / 'models' / 'species_latest.pt'
+    return jsonify({
+        'status': 'ok',
+        'image_dir': str(IMAGE_DIR),
+        'annotation_dir': str(ANNOTATION_DIR),
+        'prediction_dir': str(PREDICTION_DIR),
+        'has_species_model': model_path.exists(),
+        'species_model_path': str(model_path) if model_path.exists() else None,
+    })
+
+
 if __name__ == '__main__':
-    print(f"📸 Riistakamera Annotator")
-    print(f"📁 Image directory: {IMAGE_DIR}")
-    print(f"🌐 Starting server at http://localhost:5000")
-    
-    if not IMAGE_DIR.exists():
-        print(f"⚠️  Warning: Image directory does not exist. Creating it...")
-        IMAGE_DIR.mkdir(parents=True, exist_ok=True)
-    
+    ensure_dirs()
+    print(f"Riistakamera Annotator")
+    print(f"Image directory: {IMAGE_DIR}")
+    print(f"Annotation directory: {ANNOTATION_DIR}")
+    print(f"Starting server at http://localhost:5000")
+
     image_count = len(get_image_files())
-    print(f"📷 Found {image_count} images")
-    
+    print(f"Found {image_count} images")
+
     app.run(debug=True, host='0.0.0.0', port=5000)

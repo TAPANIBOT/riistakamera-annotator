@@ -9,10 +9,12 @@
 <body>
     <div class="container">
         <header>
-            <h1>📸 Riistakamera Annotator</h1>
+            <h1>Riistakamera Annotator</h1>
             <div class="stats">
                 <span id="image-counter">0 / 0</span>
+                <span id="image-name"></span>
                 <span id="annotation-count">0 annotaatiota</span>
+                <span id="zoom-indicator">Zoom: 100%</span>
             </div>
         </header>
 
@@ -21,47 +23,81 @@
                 <canvas id="image-canvas"></canvas>
                 <div id="loading">Ladataan kuvia...</div>
                 <div id="no-images" style="display: none;">
-                    Ei kuvia kansiossa. Lisää kuvia: ~/clawd/riistakamera/
+                    Ei kuvia kansiossa. Lisää kuvia /data/images/incoming/ -hakemistoon.
                 </div>
             </div>
 
+            <div id="status-message" class="status-message" style="display: none;"></div>
+
             <div class="controls">
                 <div class="control-group">
-                    <label for="species-select">Eläinlaji:</label>
+                    <label for="species-select">Laji:</label>
                     <select id="species-select">
                         <option value="">-- Valitse laji --</option>
-                        <option value="hirvi">🦌 Hirvi</option>
-                        <option value="kauris">🦌 Kauris</option>
-                        <option value="kettu">🦊 Kettu</option>
-                        <option value="jänis">🐰 Jänis</option>
-                        <option value="ilves">🐱 Ilves</option>
-                        <option value="karhu">🐻 Karhu</option>
-                        <option value="susi">🐺 Susi</option>
-                        <option value="muu">❓ Muu</option>
+                        <option value="kauris">1. Metsäkauris</option>
+                        <option value="peura">2. Valkohäntäpeura</option>
+                        <option value="janis">3. Jänis</option>
+                        <option value="linnut">4. Linnut</option>
+                        <option value="supikoira">5. Supikoira</option>
+                        <option value="kettu">6. Kettu</option>
+                        <option value="ihminen">7. Ihminen</option>
+                        <option value="koira">8. Koira</option>
+                        <option value="muu">9. Muu/tuntematon</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="filter-select">Suodata:</label>
+                    <select id="filter-select">
+                        <option value="all">Kaikki kuvat</option>
+                        <option value="annotated">Annotoidut</option>
+                        <option value="unannotated">Annotoimattomat</option>
+                        <option value="predicted">AI-ennusteet</option>
+                        <option value="empty">Tyhjät kuvat</option>
                     </select>
                 </div>
 
                 <div class="button-group">
-                    <button id="clear-current" class="btn btn-warning">🗑️ Tyhjennä nykyinen</button>
-                    <button id="save-btn" class="btn btn-primary">💾 Tallenna</button>
-                    <button id="next-btn" class="btn btn-success">➡️ Seuraava kuva</button>
+                    <button id="prev-btn" class="btn btn-secondary">Edellinen</button>
+                    <button id="empty-btn" class="btn btn-empty">Tyhjä kuva</button>
+                    <button id="clear-current" class="btn btn-warning">Tyhjennä</button>
+                    <button id="save-btn" class="btn btn-primary">Tallenna</button>
+                    <button id="uncertain-btn" class="btn btn-uncertain">Epävarmin</button>
+                    <button id="next-btn" class="btn btn-success">Seuraava</button>
                 </div>
             </div>
 
-            <div class="annotations-list">
-                <h3>Annotaatiot:</h3>
-                <ul id="annotations-ul"></ul>
+            <div class="side-panels">
+                <div class="annotations-list">
+                    <h3>Annotaatiot</h3>
+                    <ul id="annotations-ul"></ul>
+                </div>
+
+                <div class="predictions-panel">
+                    <h3>AI-ennusteet</h3>
+                    <div id="predictions-list">
+                        <p class="no-predictions">Ei AI-ennusteita</p>
+                    </div>
+                </div>
             </div>
 
             <div class="instructions">
-                <h4>Ohjeet:</h4>
-                <ol>
-                    <li>Vedä hiirellä laatikko eläimen ympärille</li>
-                    <li>Valitse laji pudotusvalikosta</li>
-                    <li>Klikkaa "Tallenna" tallentaaksesi annotaation</li>
-                    <li>Klikkaa "Seuraava kuva" siirtyäksesi eteenpäin</li>
-                </ol>
-                <p><strong>Pikatoiminnot:</strong> Enter = Tallenna | N = Seuraava | C = Tyhjennä</p>
+                <h4>Pikanäppäimet</h4>
+                <div class="shortcuts-grid">
+                    <span class="key">Enter</span><span>Tallenna annotaatio</span>
+                    <span class="key">N</span><span>Seuraava kuva</span>
+                    <span class="key">P</span><span>Edellinen kuva</span>
+                    <span class="key">C</span><span>Tyhjennä piirto</span>
+                    <span class="key">A</span><span>Hyväksy ennuste</span>
+                    <span class="key">R</span><span>Hylkää ennuste</span>
+                    <span class="key">E</span><span>Tyhjä kuva</span>
+                    <span class="key">U</span><span>Epävarmin kuva</span>
+                    <span class="key">1-9</span><span>Valitse laji</span>
+                    <span class="key">Ctrl+Z</span><span>Kumoa</span>
+                    <span class="key">Ctrl+Y</span><span>Tee uudelleen</span>
+                    <span class="key">Shift+rulla</span><span>Zoomaa</span>
+                    <span class="key">Shift+vedä</span><span>Panoroi</span>
+                </div>
             </div>
         </main>
     </div>
