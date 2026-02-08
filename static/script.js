@@ -1,5 +1,5 @@
-// Riistakamera Annotator — Nordic Precision Wildlife UI
-// =====================================================
+// Riistakamera Annotator — Cinematic HUD
+// ========================================
 
 const state = {
     images: [],
@@ -44,7 +44,7 @@ const SPECIES_LABELS = {
     ihminen: 'Ihminen', koira: 'Koira', muu: 'Muu/tuntematon'
 };
 
-let canvas, ctx, minimapCanvas, minimapCtx;
+let canvas, ctx;
 const img = new Image();
 
 // ===================== INIT =====================
@@ -54,8 +54,6 @@ document.addEventListener('DOMContentLoaded', init);
 async function init() {
     canvas = document.getElementById('image-canvas');
     ctx = canvas.getContext('2d');
-    minimapCanvas = document.getElementById('minimap-canvas');
-    minimapCtx = minimapCanvas.getContext('2d');
 
     // Canvas events
     canvas.addEventListener('mousedown', handleMouseDown);
@@ -67,21 +65,12 @@ async function init() {
     document.getElementById('save-btn').addEventListener('click', saveCurrentAnnotation);
     document.getElementById('next-btn').addEventListener('click', nextImage);
     document.getElementById('prev-btn').addEventListener('click', prevImage);
-    document.getElementById('clear-current').addEventListener('click', clearCurrentBox);
     document.getElementById('empty-btn').addEventListener('click', markAsEmpty);
-    document.getElementById('uncertain-btn').addEventListener('click', loadNextUncertain);
-    document.getElementById('accept-all-btn').addEventListener('click', acceptAllPredictions);
 
     // Filter
     document.getElementById('filter-select').addEventListener('change', (e) => {
         state.filter = e.target.value;
         applyFilter();
-    });
-
-    // Auto-advance toggle
-    const autoToggle = document.getElementById('auto-advance-toggle');
-    autoToggle.addEventListener('change', (e) => {
-        state.autoAdvance = e.target.checked;
     });
 
     // Shortcuts overlay
@@ -91,26 +80,9 @@ async function init() {
         if (e.target === e.currentTarget) toggleShortcuts();
     });
 
-    // Species buttons (left panel + quickbar)
-    document.querySelectorAll('.species-btn').forEach(btn => {
+    // Species pills
+    document.querySelectorAll('.sp-pill[data-species]').forEach(btn => {
         btn.addEventListener('click', () => selectSpecies(btn.dataset.species));
-    });
-    document.querySelectorAll('.qb-pill[data-species]').forEach(btn => {
-        btn.addEventListener('click', () => selectSpecies(btn.dataset.species));
-    });
-
-    // Quickbar save & empty
-    document.getElementById('qb-save-btn').addEventListener('click', saveCurrentAnnotation);
-    document.getElementById('qb-empty-btn').addEventListener('click', markAsEmpty);
-
-    // Mobile drawer toggles
-    document.getElementById('drawer-toggle-left').addEventListener('click', () => {
-        document.querySelector('.panel--left').classList.toggle('open');
-        document.querySelector('.panel--right').classList.remove('open');
-    });
-    document.getElementById('drawer-toggle-right').addEventListener('click', () => {
-        document.querySelector('.panel--right').classList.toggle('open');
-        document.querySelector('.panel--left').classList.remove('open');
     });
 
     // Keyboard
@@ -151,7 +123,6 @@ async function init() {
 function handleKeyboard(e) {
     if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
 
-    // Shortcuts overlay
     const overlay = document.getElementById('shortcuts-overlay');
     if (overlay.style.display !== 'none') {
         if (e.key === 'Escape' || e.key === '?') {
@@ -168,11 +139,10 @@ function handleKeyboard(e) {
         saveCurrentAnnotation();
         return;
     }
-    if (e.key === 'n' || e.key === 'N') { nextImage(); return; }
-    if (e.key === 'p' || e.key === 'P') { prevImage(); return; }
+    if (e.key === 'n' || e.key === 'N' || e.key === 'ArrowRight') { nextImage(); return; }
+    if (e.key === 'p' || e.key === 'P' || e.key === 'ArrowLeft') { prevImage(); return; }
     if (e.key === 'c' || e.key === 'C') { clearCurrentBox(); return; }
     if (e.key === 'e' || e.key === 'E') { markAsEmpty(); return; }
-    if (e.key === 'u' || e.key === 'U') { loadNextUncertain(); return; }
 
     // Shift+A: accept all
     if (e.shiftKey && (e.key === 'A' || e.key === 'a')) {
@@ -180,12 +150,13 @@ function handleKeyboard(e) {
         return;
     }
 
-    // A/R: accept/reject focused or first prediction
+    // A: accept first/focused prediction
     if (e.key === 'a' || e.key === 'A') {
         const idx = state.focusedPrediction >= 0 ? state.focusedPrediction : 0;
         acceptPrediction(idx);
         return;
     }
+    // R: reject first/focused prediction
     if (e.key === 'r' || e.key === 'R') {
         const idx = state.focusedPrediction >= 0 ? state.focusedPrediction : 0;
         rejectPrediction(idx);
@@ -196,7 +167,8 @@ function handleKeyboard(e) {
     if (e.key === 'Tab' && state.predictions.length > 0) {
         e.preventDefault();
         state.focusedPrediction = (state.focusedPrediction + 1) % state.predictions.length;
-        updatePredictionsFocus();
+        updatePredictionBadge();
+        drawCanvas();
         return;
     }
 
@@ -205,12 +177,12 @@ function handleKeyboard(e) {
     if (num >= 1 && num <= 9) {
         const species = Object.values(CLASS_MAP)[num - 1];
         if (!species) return;
-        // If a prediction is focused, change its species dropdown
-        if (state.focusedPrediction >= 0) {
-            const selectEl = document.querySelector(`.species-override[data-pred-index="${state.focusedPrediction}"]`);
-            if (selectEl) {
-                selectEl.value = species;
-                showStatus(`Laji: ${SPECIES_LABELS[species]}`, 'success');
+        // If predictions exist and override dropdown is visible, change the override
+        if (state.predictions.length > 0) {
+            const overrideEl = document.getElementById('pred-override');
+            if (overrideEl) {
+                overrideEl.value = species;
+                updatePredictionBadgeSpecies(species);
             }
         } else {
             selectSpecies(species);
@@ -227,12 +199,7 @@ function handleKeyboard(e) {
 
 function selectSpecies(species) {
     state.selectedSpecies = species;
-    // Sync left panel
-    document.querySelectorAll('.species-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.species === species);
-    });
-    // Sync quickbar
-    document.querySelectorAll('.qb-pill[data-species]').forEach(btn => {
+    document.querySelectorAll('.sp-pill[data-species]').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.species === species);
     });
 }
@@ -252,9 +219,9 @@ async function loadImages() {
         if (state.images.length === 0) {
             document.getElementById('no-images').textContent =
                 state.filter !== 'all'
-                    ? 'Ei kuvia tällä suodattimella. Kaikki annotoitu!'
-                    : 'Ei kuvia kansiossa. Lisää kuvia /data/images/incoming/ -hakemistoon.';
-            document.getElementById('no-images').style.display = 'block';
+                    ? 'Kaikki kuvat annotoitu!'
+                    : 'Ei kuvia kansiossa.';
+            document.getElementById('no-images').style.display = 'flex';
             return;
         }
 
@@ -273,6 +240,10 @@ async function loadImage(index) {
     state.history = [];
     state.historyIndex = -1;
     state.focusedPrediction = -1;
+    state.selectedSpecies = null;
+
+    // Clear species pill selections
+    document.querySelectorAll('.sp-pill').forEach(btn => btn.classList.remove('active'));
 
     const name = state.images[index];
 
@@ -281,7 +252,7 @@ async function loadImage(index) {
     document.getElementById('image-name').textContent = name;
     updateProgress();
 
-    // Load image (use preloaded if available)
+    // Load image
     if (state.preloadedImage && state.preloadedImage.src.includes(encodeURIComponent(name))) {
         img.src = state.preloadedImage.src;
     } else {
@@ -308,14 +279,9 @@ async function loadImage(index) {
         state.predictions = [];
     }
 
-    updateAnnotationsList();
-    updatePredictionsList();
-
-    // Redraw canvas now that annotations and predictions are loaded
-    // (img.onload may have already fired from cache/preload with empty predictions)
+    updatePredictionBadge();
+    updateConfirmButton();
     drawCanvas();
-
-    // Preload next image
     preloadNext(index + 1);
 }
 
@@ -333,30 +299,24 @@ async function loadStats() {
         const resp = await fetch('/api/stats');
         state.stats = await resp.json();
         updateProgress();
-    } catch {
-        // Stats not critical
-    }
+    } catch {}
 }
 
 function updateProgress() {
     const total = state.images.length;
     const current = state.currentIndex + 1;
-
-    // Progress text
     const textEl = document.getElementById('progress-text');
-    textEl.textContent = `${current} / ${total} kuvaa`;
-
-    // Progress bar fill
     const fillEl = document.getElementById('progress-fill');
-    const pct = total > 0 ? (current / total * 100) : 0;
-    fillEl.style.width = `${pct}%`;
 
-    // If we have stats, show annotated progress
     if (state.stats) {
         const annotated = state.stats.annotated_images + state.stats.empty_images;
-        textEl.textContent = `${current} / ${total} kuvaa (${annotated} annotoitu)`;
-        const statPct = total > 0 ? (annotated / total * 100) : 0;
-        fillEl.style.width = `${statPct}%`;
+        textEl.textContent = `${current} / ${total}  ·  ${annotated} annotoitu`;
+        const pct = state.stats.total_images > 0 ? (annotated / state.stats.total_images * 100) : 0;
+        fillEl.style.width = `${pct}%`;
+    } else {
+        textEl.textContent = `${current} / ${total}`;
+        const pct = total > 0 ? (current / total * 100) : 0;
+        fillEl.style.width = `${pct}%`;
     }
 }
 
@@ -369,7 +329,6 @@ function updateSessionTimer() {
     document.getElementById('session-time').textContent =
         `${mins}:${secs.toString().padStart(2, '0')}`;
 
-    // Speed (annotations per hour)
     const hours = elapsed / 3600000;
     const speed = hours > 0 ? Math.round(session.annotatedCount / hours) : 0;
     document.getElementById('speed-badge').textContent = `${speed}/h`;
@@ -381,8 +340,6 @@ async function advanceAfterSave() {
     if (!state.autoAdvance) return;
 
     if (state.filter !== 'all') {
-        // Re-fetch filtered list — the just-annotated image should drop off
-        const currentName = state.images[state.currentIndex];
         const filterParam = `?filter=${state.filter}`;
         try {
             const resp = await fetch(`/api/images${filterParam}`);
@@ -391,16 +348,14 @@ async function advanceAfterSave() {
 
             if (state.images.length === 0) {
                 document.getElementById('no-images').textContent = 'Kaikki kuvat annotoitu!';
-                document.getElementById('no-images').style.display = 'block';
+                document.getElementById('no-images').style.display = 'flex';
                 updateProgress();
                 return;
             }
 
-            // Stay at same index (next image slides into current position)
             const newIndex = Math.min(state.currentIndex, state.images.length - 1);
             setTimeout(() => loadImage(newIndex), 300);
         } catch {
-            // Fallback to simple next
             setTimeout(() => nextImage(), 400);
         }
     } else {
@@ -495,8 +450,8 @@ function handleZoom(e) {
     const delta = e.deltaY > 0 ? -0.1 : 0.1;
     state.zoom = Math.max(0.5, Math.min(5.0, state.zoom + delta));
 
-    document.getElementById('zoom-indicator').textContent =
-        `Zoom: ${Math.round(state.zoom * 100)}%`;
+    const zi = document.getElementById('zoom-indicator');
+    if (zi) zi.textContent = `Zoom: ${Math.round(state.zoom * 100)}%`;
 
     drawCanvas();
 }
@@ -505,7 +460,6 @@ function resetView() {
     state.zoom = 1.0;
     state.panX = 0;
     state.panY = 0;
-    document.getElementById('zoom-indicator').textContent = 'Zoom: 100%';
 }
 
 // ===================== CANVAS DRAWING =====================
@@ -524,38 +478,37 @@ function drawCanvas() {
     // Confirmed annotations (solid green)
     state.annotations.forEach((ann, idx) => {
         const [x1, y1, x2, y2] = ann.bbox;
-        ctx.strokeStyle = '#3fb950';
+        ctx.strokeStyle = '#34d399';
         ctx.lineWidth = 3 / state.zoom;
         ctx.setLineDash([]);
         ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
 
-        const label = `${idx + 1}. ${SPECIES_LABELS[ann.species] || ann.species}`;
+        const label = `${SPECIES_LABELS[ann.species] || ann.species}`;
         const fontSize = Math.max(12, 16 / state.zoom);
-        ctx.font = `bold ${fontSize}px 'Space Grotesk', sans-serif`;
+        ctx.font = `600 ${fontSize}px 'DM Sans', sans-serif`;
         const textWidth = ctx.measureText(label).width + 10;
         const labelHeight = fontSize + 8;
 
-        ctx.fillStyle = 'rgba(63, 185, 80, 0.85)';
+        ctx.fillStyle = 'rgba(52, 211, 153, 0.85)';
         ctx.fillRect(x1, y1 - labelHeight, textWidth, labelHeight);
         ctx.fillStyle = 'white';
         ctx.fillText(label, x1 + 5, y1 - 5);
     });
 
-    // Predictions (clear amber border, no fill)
+    // Predictions (amber border)
     state.predictions.forEach((pred, idx) => {
         const [x1, y1, x2, y2] = pred.bbox;
         const w = x2 - x1;
         const h = y2 - y1;
         const isFocused = idx === state.focusedPrediction;
-        const color = isFocused ? '#58a6ff' : '#f0a828';
+        const color = isFocused ? '#60a5fa' : '#f5b731';
 
-        // Thick solid border only — no fill inside
         ctx.strokeStyle = color;
         ctx.lineWidth = Math.max(3, 4 / state.zoom);
         ctx.setLineDash([]);
         ctx.strokeRect(x1, y1, w, h);
 
-        // Corner markers for extra visibility
+        // Corner markers
         const corner = Math.min(12 / state.zoom, w / 3, h / 3);
         ctx.lineWidth = Math.max(4, 5 / state.zoom);
         ctx.beginPath();
@@ -575,18 +528,15 @@ function drawCanvas() {
             : null;
         const label = conf !== null ? `${speciesLabel}  ${conf}%` : speciesLabel;
         const fontSize = Math.max(13, 16 / state.zoom);
-        ctx.font = `bold ${fontSize}px 'Space Grotesk', sans-serif`;
+        ctx.font = `600 ${fontSize}px 'DM Sans', sans-serif`;
         const textWidth = ctx.measureText(label).width + 14;
         const labelHeight = fontSize + 10;
 
-        // Label background above bbox
         const labelY = y1 - labelHeight - 3;
-        ctx.fillStyle = isFocused ? 'rgba(20, 30, 50, 0.92)' : 'rgba(15, 20, 30, 0.92)';
+        ctx.fillStyle = isFocused ? 'rgba(20, 30, 50, 0.92)' : 'rgba(12, 14, 20, 0.92)';
         ctx.fillRect(x1, labelY, textWidth, labelHeight);
-        // Color stripe on top of label
         ctx.fillStyle = color;
         ctx.fillRect(x1, labelY, textWidth, 2);
-        // Text
         ctx.fillStyle = color;
         ctx.fillText(label, x1 + 7, y1 - 8);
     });
@@ -594,7 +544,7 @@ function drawCanvas() {
     // Current drawing box (dashed blue)
     if (state.currentBox) {
         const [x1, y1, x2, y2] = state.currentBox;
-        ctx.strokeStyle = '#58a6ff';
+        ctx.strokeStyle = '#60a5fa';
         ctx.lineWidth = 2 / state.zoom;
         ctx.setLineDash([5 / state.zoom, 5 / state.zoom]);
         ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
@@ -602,70 +552,84 @@ function drawCanvas() {
     }
 
     ctx.restore();
-
-    // Update minimap
-    drawMinimap();
 }
 
-// ===================== MINIMAP =====================
+// ===================== PREDICTION BADGE =====================
 
-function drawMinimap() {
-    if (!minimapCanvas || !img.naturalWidth) return;
+function updatePredictionBadge() {
+    const badge = document.getElementById('prediction-badge');
+    const speciesEl = document.getElementById('pred-species');
+    const confEl = document.getElementById('pred-conf');
+    const overrideEl = document.getElementById('pred-override');
 
-    const mw = minimapCanvas.width;
-    const mh = minimapCanvas.height;
-    minimapCtx.clearRect(0, 0, mw, mh);
+    if (state.predictions.length === 0) {
+        badge.style.display = 'none';
+        return;
+    }
 
-    // Background
-    minimapCtx.fillStyle = '#0a0e14';
-    minimapCtx.fillRect(0, 0, mw, mh);
+    badge.style.display = 'block';
 
-    // Draw thumbnail
-    const aspect = img.naturalWidth / img.naturalHeight;
-    let tw, th;
-    if (aspect > mw / mh) {
-        tw = mw;
-        th = mw / aspect;
+    // Show the focused or first prediction
+    const idx = state.focusedPrediction >= 0 ? state.focusedPrediction : 0;
+    const pred = state.predictions[idx];
+
+    const species = pred.species || 'muu';
+    speciesEl.textContent = SPECIES_LABELS[species] || species;
+
+    const conf = pred.species_confidence
+        ? Math.round(pred.species_confidence * 100)
+        : pred.md_confidence
+        ? Math.round(pred.md_confidence * 100)
+        : null;
+
+    if (conf !== null) {
+        confEl.textContent = `${conf}%`;
+        confEl.className = 'hud-prediction__conf ' + (
+            conf >= 90 ? 'hud-prediction__conf--high'
+            : conf >= 50 ? 'hud-prediction__conf--med'
+            : 'hud-prediction__conf--low'
+        );
     } else {
-        th = mh;
-        tw = mh * aspect;
+        confEl.textContent = '';
     }
-    const tx = (mw - tw) / 2;
-    const ty = (mh - th) / 2;
 
-    minimapCtx.drawImage(img, tx, ty, tw, th);
+    // Build override dropdown
+    overrideEl.innerHTML = Object.entries(SPECIES_LABELS).map(([key, label]) => {
+        const sel = key === species ? ' selected' : '';
+        return `<option value="${key}"${sel}>${label}</option>`;
+    }).join('');
 
-    // Draw viewport rectangle (only when zoomed)
-    if (state.zoom > 1.05) {
-        const canvasRect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / canvasRect.width;
-        const scaleY = canvas.height / canvasRect.height;
-
-        // Visible area in image coordinates
-        const vx = -state.panX / state.zoom;
-        const vy = -state.panY / state.zoom;
-        const vw = (canvas.width * scaleX) / state.zoom;
-        const vh = (canvas.height * scaleY) / state.zoom;
-
-        // Map to minimap coordinates
-        const mx = tx + (vx / img.naturalWidth) * tw;
-        const my = ty + (vy / img.naturalHeight) * th;
-        const mmw = (vw / img.naturalWidth) * tw;
-        const mmh = (vh / img.naturalHeight) * th;
-
-        minimapCtx.strokeStyle = '#58a6ff';
-        minimapCtx.lineWidth = 1.5;
-        minimapCtx.strokeRect(mx, my, mmw, mmh);
-
-        minimapCtx.fillStyle = 'rgba(88, 166, 255, 0.08)';
-        minimapCtx.fillRect(mx, my, mmw, mmh);
+    // Multi-prediction count
+    let countEl = badge.querySelector('.hud-prediction__count');
+    if (state.predictions.length > 1) {
+        if (!countEl) {
+            countEl = document.createElement('div');
+            countEl.className = 'hud-prediction__count';
+            badge.appendChild(countEl);
+        }
+        countEl.textContent = `${idx + 1} / ${state.predictions.length} ennustetta · Tab vaihtaa`;
+    } else if (countEl) {
+        countEl.remove();
     }
+}
+
+function updatePredictionBadgeSpecies(species) {
+    const speciesEl = document.getElementById('pred-species');
+    if (speciesEl) {
+        speciesEl.textContent = SPECIES_LABELS[species] || species;
+    }
+}
+
+function updateConfirmButton() {
+    const btn = document.getElementById('save-btn');
+    if (!btn) return;
+    btn.classList.toggle('confirm-ready', state.predictions.length > 0);
 }
 
 // ===================== ANNOTATIONS =====================
 
 function saveCurrentAnnotation() {
-    // CASE 1: User drew a box — save it with selected species
+    // CASE 1: User drew a box
     if (state.currentBox) {
         const species = state.selectedSpecies;
         if (!species) {
@@ -685,7 +649,6 @@ function saveCurrentAnnotation() {
         state.isEmptyImage = false;
 
         saveAnnotationsToServer();
-        updateAnnotationsList();
         drawCanvas();
 
         session.annotatedCount++;
@@ -696,7 +659,7 @@ function saveCurrentAnnotation() {
         return;
     }
 
-    // CASE 2: No drawn box but AI predictions exist — accept all predictions
+    // CASE 2: AI predictions exist — accept all
     if (state.predictions.length > 0) {
         acceptAllPredictions();
         return;
@@ -711,7 +674,6 @@ function deleteAnnotation(index) {
     pushHistory();
     state.annotations.splice(index, 1);
     saveAnnotationsToServer();
-    updateAnnotationsList();
     drawCanvas();
 }
 
@@ -744,10 +706,9 @@ function markAsEmpty() {
     state.isEmptyImage = true;
     state.currentBox = null;
     saveAnnotationsToServer();
-    updateAnnotationsList();
     drawCanvas();
     session.annotatedCount++;
-    showStatus('Merkitty tyhjäksi kuvaksi', 'success');
+    showStatus('Tyhjä kuva', 'success');
 
     advanceAfterSave();
     loadStats();
@@ -761,8 +722,9 @@ function acceptPrediction(index) {
     const pred = state.predictions[index];
     pushHistory();
 
-    const selectEl = document.querySelector(`.species-override[data-pred-index="${index}"]`);
-    const species = selectEl ? selectEl.value : (pred.species || 'muu');
+    // Use override dropdown value if visible, otherwise pred species
+    const overrideEl = document.getElementById('pred-override');
+    const species = overrideEl ? overrideEl.value : (pred.species || 'muu');
     const originalSpecies = pred.species || 'muu';
 
     state.annotations.push({
@@ -781,8 +743,8 @@ function acceptPrediction(index) {
     }
 
     saveAnnotationsToServer();
-    updateAnnotationsList();
-    updatePredictionsList();
+    updatePredictionBadge();
+    updateConfirmButton();
     drawCanvas();
 
     session.annotatedCount++;
@@ -795,7 +757,8 @@ function rejectPrediction(index) {
     if (state.focusedPrediction >= state.predictions.length) {
         state.focusedPrediction = state.predictions.length - 1;
     }
-    updatePredictionsList();
+    updatePredictionBadge();
+    updateConfirmButton();
     drawCanvas();
 }
 
@@ -803,9 +766,11 @@ function acceptAllPredictions() {
     if (state.predictions.length === 0) return;
     pushHistory();
 
-    state.predictions.forEach((pred, idx) => {
-        const selectEl = document.querySelector(`.species-override[data-pred-index="${idx}"]`);
-        const species = selectEl ? selectEl.value : (pred.species || 'muu');
+    const overrideEl = document.getElementById('pred-override');
+    const overrideSpecies = overrideEl ? overrideEl.value : null;
+
+    state.predictions.forEach((pred) => {
+        const species = overrideSpecies || pred.species || 'muu';
         const originalSpecies = pred.species || 'muu';
         state.annotations.push({
             bbox: pred.bbox.map(Math.round),
@@ -823,8 +788,8 @@ function acceptAllPredictions() {
     state.focusedPrediction = -1;
 
     saveAnnotationsToServer();
-    updateAnnotationsList();
-    updatePredictionsList();
+    updatePredictionBadge();
+    updateConfirmButton();
     drawCanvas();
 
     session.annotatedCount += count;
@@ -834,139 +799,17 @@ function acceptAllPredictions() {
     loadStats();
 }
 
-// ===================== UI UPDATES =====================
-
-function updateAnnotationsList() {
-    const ul = document.getElementById('annotations-ul');
-    ul.innerHTML = '';
-
-    if (state.isEmptyImage) {
-        const li = document.createElement('li');
-        li.className = 'annotation-card';
-        li.style.borderLeftColor = 'var(--text-muted)';
-        li.innerHTML = `
-            <div class="annotation-card__info">
-                <span class="annotation-card__species" style="color: var(--text-muted); font-style: italic;">Tyhjä kuva</span>
-            </div>
-        `;
-        ul.appendChild(li);
-        return;
-    }
-
-    state.annotations.forEach((ann, idx) => {
-        const li = document.createElement('li');
-        li.className = 'annotation-card';
-        li.style.animationDelay = `${idx * 80}ms`;
-        const label = SPECIES_LABELS[ann.species] || ann.species;
-        const [x1, y1, x2, y2] = ann.bbox;
-        li.innerHTML = `
-            <div class="annotation-card__info">
-                <span class="annotation-card__species">${idx + 1}. ${label}</span>
-                <span class="annotation-card__bbox">[${x1}, ${y1}, ${x2}, ${y2}]</span>
-            </div>
-            <button class="annotation-card__delete" onclick="deleteAnnotation(${idx})" title="Poista">&times;</button>
-        `;
-        ul.appendChild(li);
-    });
-}
-
-function buildSpeciesOptions(selectedSpecies) {
-    return Object.entries(SPECIES_LABELS).map(([key, label]) => {
-        const sel = key === selectedSpecies ? ' selected' : '';
-        return `<option value="${key}"${sel}>${label}</option>`;
-    }).join('');
-}
-
-function updatePredictionsList() {
-    const container = document.getElementById('predictions-list');
-    if (!container) return;
-
-    if (state.predictions.length === 0) {
-        container.innerHTML = '<p class="no-data">Ei AI-ennusteita</p>';
-        updateSaveButtonState();
-        return;
-    }
-
-    container.innerHTML = '';
-    state.predictions.forEach((pred, idx) => {
-        const species = pred.species || 'muu';
-        const label = SPECIES_LABELS[species] || species;
-        const conf = pred.species_confidence
-            ? Math.round(pred.species_confidence * 100)
-            : pred.md_confidence
-            ? Math.round(pred.md_confidence * 100)
-            : null;
-
-        const confClass = conf !== null
-            ? (conf >= 90 ? 'prediction-card__conf--high'
-               : conf >= 50 ? 'prediction-card__conf--med'
-               : 'prediction-card__conf--low')
-            : '';
-
-        const focused = idx === state.focusedPrediction ? ' focused' : '';
-
-        const div = document.createElement('div');
-        div.className = `prediction-card${focused}`;
-        div.style.animationDelay = `${idx * 80}ms`;
-        div.innerHTML = `
-            <div class="prediction-card__header">
-                <span class="prediction-card__species">${label}</span>
-                ${conf !== null ? `<span class="prediction-card__conf ${confClass}">${conf}%</span>` : ''}
-            </div>
-            <select class="species-override" data-pred-index="${idx}">
-                ${buildSpeciesOptions(species)}
-            </select>
-            <div class="prediction-card__bbox">[${pred.bbox.map(Math.round).join(', ')}]</div>
-            <div class="prediction-card__actions">
-                <button class="btn-accept" onclick="acceptPrediction(${idx})" title="Hyväksy (A)">Hyväksy</button>
-                <button class="btn-reject" onclick="rejectPrediction(${idx})" title="Hylkää (R)">Hylkää</button>
-            </div>
-        `;
-        container.appendChild(div);
-    });
-    updateSaveButtonState();
-}
-
-function updateSaveButtonState() {
-    const saveBtn = document.getElementById('qb-save-btn');
-    if (!saveBtn) return;
-    saveBtn.classList.toggle('qb-save--ready', state.predictions.length > 0);
-}
-
-function updatePredictionsFocus() {
-    const cards = document.querySelectorAll('.prediction-card');
-    cards.forEach((card, idx) => {
-        card.classList.toggle('focused', idx === state.focusedPrediction);
-    });
-    drawCanvas();
-}
-
-function drawEmptyOverlay() {
-    ctx.fillStyle = 'rgba(90, 107, 130, 0.4)';
-    ctx.fillRect(0, 0, img.naturalWidth, img.naturalHeight);
-    const fontSize = Math.max(40, img.naturalWidth / 15);
-    ctx.font = `bold ${fontSize}px 'Space Grotesk', sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(226, 232, 240, 0.7)';
-    ctx.fillText('TYHJÄ KUVA', img.naturalWidth / 2, img.naturalHeight / 2);
-    ctx.textAlign = 'start';
-    ctx.textBaseline = 'alphabetic';
-}
-
-// ===================== STATUS =====================
+// ===================== STATUS TOAST =====================
 
 function showStatus(message, type) {
     const el = document.getElementById('status-message');
     if (!el) return;
     el.textContent = message;
-    el.className = `statusbar__item statusbar__message statusbar__message--${type}`;
-    // Clear after 3 seconds
+    el.className = `hud-toast visible hud-toast--${type}`;
     clearTimeout(el._timeout);
     el._timeout = setTimeout(() => {
-        el.textContent = '';
-        el.className = 'statusbar__item statusbar__message';
-    }, 3000);
+        el.classList.remove('visible');
+    }, 2500);
 }
 
 // ===================== SHORTCUTS OVERLAY =====================
@@ -998,7 +841,6 @@ function undo() {
     state.annotations = JSON.parse(JSON.stringify(state.history[state.historyIndex]));
     state.historyIndex--;
     saveAnnotationsToServer();
-    updateAnnotationsList();
     drawCanvas();
 }
 
@@ -1007,8 +849,22 @@ function redo() {
     state.historyIndex++;
     state.annotations = JSON.parse(JSON.stringify(state.history[state.historyIndex]));
     saveAnnotationsToServer();
-    updateAnnotationsList();
     drawCanvas();
+}
+
+// ===================== EMPTY OVERLAY =====================
+
+function drawEmptyOverlay() {
+    ctx.fillStyle = 'rgba(74, 85, 104, 0.4)';
+    ctx.fillRect(0, 0, img.naturalWidth, img.naturalHeight);
+    const fontSize = Math.max(40, img.naturalWidth / 15);
+    ctx.font = `700 ${fontSize}px 'DM Sans', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(232, 236, 244, 0.6)';
+    ctx.fillText('TYHJÄ KUVA', img.naturalWidth / 2, img.naturalHeight / 2);
+    ctx.textAlign = 'start';
+    ctx.textBaseline = 'alphabetic';
 }
 
 // ===================== ACTIVE LEARNING =====================
@@ -1018,19 +874,19 @@ async function loadNextUncertain() {
         const resp = await fetch('/api/active-learning/ranking?limit=1');
         const data = await resp.json();
         if (!data.ranking || data.ranking.length === 0) {
-            showStatus('Ei epävarmoja kuvia jäljellä!', 'warning');
+            showStatus('Ei epävarmoja kuvia', 'warning');
             return;
         }
         const imageName = data.ranking[0].image;
         const idx = state.images.indexOf(imageName);
         if (idx >= 0) {
             await loadImage(idx);
-            showStatus(`Epävarmin: ${imageName} (${Math.round(data.ranking[0].max_confidence * 100)}%)`, 'success');
+            showStatus(`Epävarmin: ${Math.round(data.ranking[0].max_confidence * 100)}%`, 'success');
         } else {
-            showStatus('Kuvaa ei löydy listasta', 'warning');
+            showStatus('Kuvaa ei löydy', 'warning');
         }
     } catch (err) {
-        console.error('Active learning -virhe:', err);
+        console.error('Active learning error:', err);
         showStatus('Epävarmuusjärjestyksen haku epäonnistui', 'error');
     }
 }
