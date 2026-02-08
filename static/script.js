@@ -665,8 +665,8 @@ function saveCurrentAnnotation() {
         return;
     }
 
-    // CASE 3: Nothing to save
-    showStatus('Piirrä laatikko tai hyväksy ennusteet', 'warning');
+    // CASE 3: No box, no predictions — mark as empty and advance
+    markAsEmpty();
 }
 
 function deleteAnnotation(index) {
