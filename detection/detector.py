@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Eläintunnistus: MegaDetector v5A + YOLO-lajimalli.
+Eläintunnistus: MegaDetector v5A + SpeciesNet/YOLO-lajimalli.
 
 Kaksivaihemalli:
 1. MegaDetector: Havaitsee eläimen/ihmisen/ajoneuvon ja piirtää bounding boxin
-2. YOLO-lajimalli: Rajattu kuva-alue → lajitunnistus (kauris, peura, jne.)
+2. SpeciesNet: Rajattu kuva-alue → lajitunnistus (kauris, peura, jne.)
 """
 import json
 import os
@@ -29,25 +29,55 @@ CLASS_MAP = {
     8: 'muu',
 }
 
+# SpeciesNet taksonomia → suomalaiset lajinimet
+SPECIESNET_TO_FINNISH = {
+    'capreolus capreolus': 'kauris',
+    'odocoileus virginianus': 'peura',
+    'lepus europaeus': 'janis',
+    'lepus timidus': 'janis',
+    'vulpes vulpes': 'kettu',
+    'nyctereutes procyonoides': 'supikoira',
+    'homo sapiens': 'ihminen',
+    'canis familiaris': 'koira',
+    'canis lupus familiaris': 'koira',
+    'alces alces': 'muu',       # hirvi
+    'sus scrofa': 'muu',        # villisika
+    'lynx lynx': 'muu',         # ilves
+    'meles meles': 'muu',       # mäyrä
+    'mustela erminea': 'muu',   # kärppä
+    'martes martes': 'muu',     # näätä
+    'sciurus vulgaris': 'muu',  # orava
+    'lutra lutra': 'muu',       # saukko
+    'cervus elaphus': 'peura',  # saksanhirvi
+    'dama dama': 'peura',       # kuusipeura
+}
+
 
 class WildlifeDetector:
     """
     Kaksivaihemalli riistakamerakuvien tunnistukseen.
 
     - MegaDetector v5A: bbox-tunnistus (aina saatavilla)
-    - YOLO-lajimalli: lajitunnistus (valinnainen, paranee koulutuksella)
+    - SpeciesNet: lajitunnistus (Google, 2000+ lajia, geofencing)
+    - YOLO-lajimalli: vaihtoehtoinen lajitunnistus (custom-koulutettu)
     """
 
-    def __init__(self, megadetector_model=None, species_model_path=None, confidence_threshold=0.2):
+    def __init__(self, megadetector_model=None, species_model_path=None,
+                 confidence_threshold=0.2, use_speciesnet=True):
         self.confidence_threshold = confidence_threshold
         self.md_model = None
         self.species_model = None
+        self.speciesnet_classifier = None
 
         # Lataa MegaDetector
         if megadetector_model:
             self._load_megadetector(megadetector_model)
 
-        # Lataa lajimalli (valinnainen)
+        # Lataa SpeciesNet (ensisijainen lajimalli)
+        if use_speciesnet:
+            self._load_speciesnet()
+
+        # Lataa YOLO-lajimalli (vaihtoehtoinen/varasuunnitelma)
         if species_model_path and Path(species_model_path).exists():
             self._load_species_model(species_model_path)
 
@@ -59,13 +89,24 @@ class WildlifeDetector:
         except Exception as e:
             raise RuntimeError(f"MegaDetector-lataus epäonnistui: {e}")
 
+    def _load_speciesnet(self):
+        """Lataa SpeciesNet crop classifier lajintunnistukseen."""
+        try:
+            from speciesnet.classifier import SpeciesNetClassifier
+            print("Ladataan SpeciesNet crop classifier...")
+            self.speciesnet_classifier = SpeciesNetClassifier(device="cpu")
+            print("SpeciesNet ladattu.")
+        except Exception as e:
+            print(f"SpeciesNet-lataus epäonnistui: {e}")
+            self.speciesnet_classifier = None
+
     def _load_species_model(self, model_path):
-        """Lataa YOLO-lajimalli."""
+        """Lataa YOLO-lajimalli (vaihtoehtoinen)."""
         try:
             from ultralytics import YOLO
             self.species_model = YOLO(model_path)
         except Exception as e:
-            print(f"Lajimallin lataus epäonnistui: {e}")
+            print(f"YOLO-lajimallin lataus epäonnistui: {e}")
 
     def detect(self, image_path, confidence_threshold=None):
         """
@@ -132,11 +173,22 @@ class WildlifeDetector:
                 prediction['species'] = 'ihminen'
                 prediction['species_confidence'] = round(md_conf, 4)
 
-            # Vaihe 2: Lajitunnistus (jos malli ja eläin)
-            elif md_cat == '1' and self.species_model is not None:
-                species_result = self._classify_species(
-                    image_path, [x1, y1, x2, y2]
-                )
+            # Vaihe 2: Lajitunnistus (SpeciesNet tai YOLO)
+            elif md_cat == '1':
+                species_result = None
+
+                # Ensisijainen: SpeciesNet
+                if self.speciesnet_classifier is not None:
+                    species_result = self._classify_with_speciesnet(
+                        image_path, [x1, y1, x2, y2]
+                    )
+
+                # Vaihtoehtoinen: YOLO custom -malli
+                if species_result is None and self.species_model is not None:
+                    species_result = self._classify_species(
+                        image_path, [x1, y1, x2, y2]
+                    )
+
                 if species_result:
                     prediction['species'] = species_result['species']
                     prediction['species_confidence'] = species_result['confidence']
@@ -167,6 +219,75 @@ class WildlifeDetector:
             }
             for d in result.get('detections', [])
         ]
+
+    def _classify_with_speciesnet(self, image_path, bbox):
+        """
+        Tunnista laji SpeciesNet crop classifier -mallilla.
+
+        Args:
+            image_path: Kuvan polku
+            bbox: [x1, y1, x2, y2] pikseleinä
+
+        Returns:
+            dict: {'species': str, 'confidence': float} tai None
+        """
+        try:
+            from PIL import Image as PILImage
+
+            with PILImage.open(image_path) as img:
+                # Rajaa bbox-alue pienellä marginaalilla
+                x1, y1, x2, y2 = bbox
+                margin = int(max(x2 - x1, y2 - y1) * 0.1)
+                x1 = max(0, x1 - margin)
+                y1 = max(0, y1 - margin)
+                x2 = min(img.width, x2 + margin)
+                y2 = min(img.height, y2 + margin)
+
+                crop = img.crop((x1, y1, x2, y2))
+                # SpeciesNet odottaa 480x480 crop
+                crop_resized = crop.resize((480, 480), PILImage.Resampling.LANCZOS)
+
+            # Esikäsittele ja ennusta
+            preprocessed = self.speciesnet_classifier.preprocess(crop_resized)
+            result = self.speciesnet_classifier.predict(str(image_path), preprocessed)
+
+            if result and 'classifications' in result:
+                classes = result['classifications'].get('classes', [])
+                scores = result['classifications'].get('scores', [])
+
+                if classes and scores:
+                    top_class = classes[0].lower()
+                    top_score = float(scores[0])
+
+                    # Muunna SpeciesNet taksonomia suomalaiseksi lajinimeksi
+                    finnish_name = SPECIESNET_TO_FINNISH.get(top_class)
+
+                    # Jos ei suoraa vastaavuutta, yritä osittainen haku
+                    if finnish_name is None:
+                        for taxon, name in SPECIESNET_TO_FINNISH.items():
+                            if taxon in top_class or top_class in taxon:
+                                finnish_name = name
+                                break
+
+                    # Jos tuntematon laji, käytä 'muu'
+                    if finnish_name is None:
+                        # Tarkista onko lintu
+                        if 'aves' in top_class or 'bird' in top_class:
+                            finnish_name = 'linnut'
+                        else:
+                            finnish_name = 'muu'
+
+                    if top_score >= 0.3:  # Minimikonfidenssi
+                        return {
+                            'species': finnish_name,
+                            'confidence': round(top_score, 4),
+                            'speciesnet_class': top_class,
+                        }
+
+        except Exception as e:
+            print(f"SpeciesNet-tunnistusvirhe: {e}")
+
+        return None
 
     def _classify_species(self, image_path, bbox):
         """

@@ -262,12 +262,19 @@ def recent_detections():
 def get_status():
     """Palvelun tila."""
     model_path = DATA_DIR / 'models' / 'species_latest.pt'
+    speciesnet_available = False
+    try:
+        import speciesnet
+        speciesnet_available = True
+    except ImportError:
+        pass
     return jsonify({
         'status': 'ok',
         'image_dir': str(IMAGE_DIR),
         'annotation_dir': str(ANNOTATION_DIR),
         'prediction_dir': str(PREDICTION_DIR),
-        'has_species_model': model_path.exists(),
+        'has_species_model': model_path.exists() or speciesnet_available,
+        'has_speciesnet': speciesnet_available,
         'species_model_path': str(model_path) if model_path.exists() else None,
     })
 
