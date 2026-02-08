@@ -129,18 +129,20 @@ body {
 
 .progress-bar {
     flex: 1;
-    height: 6px;
+    height: 8px;
     background: var(--bg-overlay);
-    border-radius: 3px;
+    border-radius: 4px;
     overflow: hidden;
+    border: 1px solid var(--border-subtle);
 }
 
 .progress-bar__fill {
     height: 100%;
     width: 0%;
-    background: var(--accent-green);
-    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent-green), #50d060);
+    border-radius: 4px;
     transition: width 600ms var(--ease-out-expo);
+    box-shadow: 0 0 8px rgba(63, 185, 80, 0.3);
 }
 
 .progress-bar__text {
@@ -554,8 +556,9 @@ body {
 
 #image-canvas {
     display: block;
-    max-width: 100%;
-    max-height: 100%;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
     cursor: crosshair;
     image-rendering: auto;
 }
@@ -683,19 +686,24 @@ body {
 }
 
 .btn-accept {
-    background: rgba(63, 185, 80, 0.15);
+    background: var(--bg-overlay);
     color: var(--accent-green);
+    border: 1px solid rgba(63, 185, 80, 0.3);
 }
 .btn-accept:hover {
-    background: rgba(63, 185, 80, 0.3);
+    background: rgba(63, 185, 80, 0.15);
+    border-color: var(--accent-green);
 }
 
 .btn-reject {
-    background: rgba(248, 81, 73, 0.15);
-    color: var(--accent-red);
+    background: var(--bg-overlay);
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
 }
 .btn-reject:hover {
-    background: rgba(248, 81, 73, 0.3);
+    background: rgba(248, 81, 73, 0.1);
+    color: var(--accent-red);
+    border-color: rgba(248, 81, 73, 0.3);
 }
 
 /* Annotation cards */

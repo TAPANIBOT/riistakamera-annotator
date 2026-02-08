@@ -471,19 +471,16 @@ function drawCanvas() {
         ctx.fillText(label, x1 + 5, y1 - 5);
     });
 
-    // Predictions (bright amber, highly visible)
+    // Predictions (clear amber border, no fill)
     state.predictions.forEach((pred, idx) => {
         const [x1, y1, x2, y2] = pred.bbox;
         const w = x2 - x1;
         const h = y2 - y1;
         const isFocused = idx === state.focusedPrediction;
+        const color = isFocused ? '#58a6ff' : '#f0a828';
 
-        // Semi-transparent fill so bbox area is clearly highlighted
-        ctx.fillStyle = isFocused ? 'rgba(88, 166, 255, 0.2)' : 'rgba(240, 168, 40, 0.25)';
-        ctx.fillRect(x1, y1, w, h);
-
-        // Thick solid border (no dashes — more visible on dark images)
-        ctx.strokeStyle = isFocused ? '#58a6ff' : '#f0a828';
+        // Thick solid border only — no fill inside
+        ctx.strokeStyle = color;
         ctx.lineWidth = Math.max(3, 4 / state.zoom);
         ctx.setLineDash([]);
         ctx.strokeRect(x1, y1, w, h);
@@ -492,38 +489,36 @@ function drawCanvas() {
         const corner = Math.min(12 / state.zoom, w / 3, h / 3);
         ctx.lineWidth = Math.max(4, 5 / state.zoom);
         ctx.beginPath();
-        // Top-left
         ctx.moveTo(x1, y1 + corner); ctx.lineTo(x1, y1); ctx.lineTo(x1 + corner, y1);
-        // Top-right
         ctx.moveTo(x2 - corner, y1); ctx.lineTo(x2, y1); ctx.lineTo(x2, y1 + corner);
-        // Bottom-right
         ctx.moveTo(x2, y2 - corner); ctx.lineTo(x2, y2); ctx.lineTo(x2 - corner, y2);
-        // Bottom-left
         ctx.moveTo(x1 + corner, y2); ctx.lineTo(x1, y2); ctx.lineTo(x1, y2 - corner);
         ctx.stroke();
 
-        // Label
-        const species = pred.species || 'Eläin';
-        const speciesLabel = SPECIES_LABELS[species] || species;
+        // Species label
+        const species = pred.species;
+        const speciesLabel = species ? (SPECIES_LABELS[species] || species) : 'Eläin (laji tunnistamatta)';
         const conf = pred.species_confidence
             ? Math.round(pred.species_confidence * 100)
             : pred.md_confidence
             ? Math.round(pred.md_confidence * 100)
             : null;
-        const label = conf !== null ? `AI: ${speciesLabel} ${conf}%` : `AI: ${speciesLabel}`;
+        const label = conf !== null ? `${speciesLabel}  ${conf}%` : speciesLabel;
         const fontSize = Math.max(13, 16 / state.zoom);
         ctx.font = `bold ${fontSize}px 'Space Grotesk', sans-serif`;
-        const textWidth = ctx.measureText(label).width + 12;
+        const textWidth = ctx.measureText(label).width + 14;
         const labelHeight = fontSize + 10;
 
-        // Label background with rounded appearance
-        ctx.fillStyle = isFocused ? 'rgba(88, 166, 255, 0.9)' : 'rgba(240, 168, 40, 0.9)';
-        ctx.fillRect(x1, y1 - labelHeight - 2, textWidth, labelHeight);
-        ctx.fillStyle = '#000';
-        ctx.fillText(label, x1 + 6, y1 - 7);
-        // White text on top for contrast
-        ctx.fillStyle = '#fff';
-        ctx.fillText(label, x1 + 5, y1 - 8);
+        // Label background above bbox
+        const labelY = y1 - labelHeight - 3;
+        ctx.fillStyle = isFocused ? 'rgba(20, 30, 50, 0.92)' : 'rgba(15, 20, 30, 0.92)';
+        ctx.fillRect(x1, labelY, textWidth, labelHeight);
+        // Color stripe on top of label
+        ctx.fillStyle = color;
+        ctx.fillRect(x1, labelY, textWidth, 2);
+        // Text
+        ctx.fillStyle = color;
+        ctx.fillText(label, x1 + 7, y1 - 8);
     });
 
     // Current drawing box (dashed blue)
