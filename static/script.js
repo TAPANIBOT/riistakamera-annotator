@@ -314,13 +314,14 @@ function updateProgress() {
 
     if (state.stats) {
         const annotated = state.stats.annotated_images + state.stats.empty_images;
-        textEl.textContent = `${current} / ${total}  ·  ${annotated} annotoitu`;
-        const pct = state.stats.total_images > 0 ? (annotated / state.stats.total_images * 100) : 0;
+        const totalAll = state.stats.total_images;
+        const remaining = totalAll - annotated;
+        textEl.textContent = `${annotated} / ${totalAll} annotoitu · ${remaining} jäljellä`;
+        const pct = totalAll > 0 ? (annotated / totalAll * 100) : 0;
         fillEl.style.width = `${pct}%`;
     } else {
-        textEl.textContent = `${current} / ${total}`;
-        const pct = total > 0 ? (current / total * 100) : 0;
-        fillEl.style.width = `${pct}%`;
+        textEl.textContent = `${total} kuvaa`;
+        fillEl.style.width = '0%';
     }
 }
 
