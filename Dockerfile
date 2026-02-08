@@ -15,11 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*
 
-# Python-riippuvuudet
+# Python-riippuvuudet (onnx>=1.20 pinnattu ARM64 wheel -saatavuuden vuoksi)
 COPY requirements.txt .
-# Asenna onnx>=1.20 binäärinä ennen muita (ARM64 wheel saatavilla)
-RUN pip install --no-cache-dir "onnx>=1.20" "onnxruntime>=1.20" && \
-    pip install --no-cache-dir -r requirements.txt && \
+RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir --no-deps megadetector>=10.0.17
 
 # Kopioi sovellus
