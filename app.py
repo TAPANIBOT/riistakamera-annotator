@@ -206,12 +206,17 @@ def fetch_images():
     try:
         from ingestion.fetch_camera_emails import fetch_camera_images
         result = fetch_camera_images()
-        if result.get('new_images'):
+    except Exception as e:
+        return jsonify({'error': f'Sähköpostihaku epäonnistui: {e}'}), 500
+
+    if result.get('new_images'):
+        try:
             from detection.detect_batch import detect_new_images
             result['detection'] = detect_new_images()
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        except Exception as e:
+            result['detection_error'] = str(e)
+
+    return jsonify(result)
 
 
 @app.route('/api/recent-detections')
