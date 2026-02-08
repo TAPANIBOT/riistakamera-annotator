@@ -3,7 +3,12 @@
    Glassmorphic dark theme, same CSS vars as annotator
    ============================================ */
 
-/* Override annotator body overflow */
+/* Override annotator body/html overflow */
+html:has(.dashboard-body) {
+    overflow: auto !important;
+    height: auto !important;
+}
+
 .dashboard-body {
     overflow: auto !important;
     height: auto !important;

@@ -30,8 +30,8 @@ Chart.defaults.plugins.tooltip.cornerRadius = 8;
 Chart.defaults.plugins.tooltip.padding = 10;
 Chart.defaults.plugins.legend.labels.boxWidth = 12;
 Chart.defaults.plugins.legend.labels.padding = 14;
-Chart.defaults.scale.grid = { color: 'rgba(255,255,255,0.04)' };
-Chart.defaults.scale.border = { color: 'rgba(255,255,255,0.06)' };
+Chart.defaults.scale.grid.color = 'rgba(255,255,255,0.04)';
+Chart.defaults.scale.border.color = 'rgba(255,255,255,0.06)';
 
 // Store chart instances for destroy/recreate
 const charts = {};
