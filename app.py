@@ -713,6 +713,148 @@ def gallery_data():
     })
 
 
+@app.route('/api/ai/brief')
+def ai_brief():
+    """Token-efficient plain text summary for AI agents."""
+    from flask import Response
+
+    # Parse params
+    days = request.args.get('days', 7, type=int)
+    if days < 1 or days > 90:
+        return Response('Virhe: days oltava 1-90', status=400, mimetype='text/plain')
+
+    sp_param = request.args.get('species', '')
+    species_filter = {s.strip() for s in sp_param.split(',') if s.strip()} if sp_param else None
+    detail = request.args.get('detail', 'summary')
+    from_date_param = request.args.get('from_date', '')
+
+    # Calculate date range
+    from datetime import timedelta
+    today = datetime.now()
+    if from_date_param:
+        try:
+            range_start = datetime.strptime(from_date_param, '%Y-%m-%d')
+            range_end = range_start + timedelta(days=1)
+        except ValueError:
+            return Response('Virhe: from_date muodossa YYYY-MM-DD', status=400, mimetype='text/plain')
+    else:
+        range_start = today - timedelta(days=days)
+        range_end = today + timedelta(days=1)
+
+    start_str = range_start.strftime('%Y-%m-%d')
+    end_str = range_end.strftime('%Y-%m-%d')
+
+    images = get_image_files()
+
+    total_images = 0
+    empty_count = 0
+    unannotated_count = 0
+    total_detections = 0
+    species_counts = {}
+    hourly_totals = {}  # hour -> count
+    ai_accuracy = {}    # species -> {correct, total}
+
+    for img_name in images:
+        camera_date, camera_hour = _parse_camera_datetime(img_name)
+
+        # Date filtering
+        if camera_date and camera_date < start_str:
+            continue
+        if camera_date and camera_date >= end_str:
+            continue
+
+        total_images += 1
+
+        ann_path = get_annotation_path(img_name)
+        if not ann_path.exists():
+            unannotated_count += 1
+            continue
+
+        with open(ann_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        if data.get('is_empty', False):
+            empty_count += 1
+            continue
+
+        anns = data.get('annotations', [])
+        if not anns:
+            unannotated_count += 1
+            continue
+
+        for ann in anns:
+            sp = ann.get('species', 'muu')
+            if species_filter and sp not in species_filter:
+                continue
+
+            total_detections += 1
+            label = SPECIES_LABELS.get(sp, sp).lower()
+            species_counts[label] = species_counts.get(label, 0) + 1
+
+            if camera_hour is not None:
+                hourly_totals[camera_hour] = hourly_totals.get(camera_hour, 0) + 1
+
+            if ann.get('from_prediction'):
+                if sp not in ai_accuracy:
+                    ai_accuracy[sp] = {'correct': 0, 'total': 0}
+                ai_accuracy[sp]['total'] += 1
+                if ann.get('original_species', '') == sp:
+                    ai_accuracy[sp]['correct'] += 1
+
+    # Build response
+    if total_images == 0 or (total_detections == 0 and empty_count == 0 and unannotated_count == 0):
+        return Response('Ei havaintoja valitulla aikavälillä.', mimetype='text/plain')
+
+    if species_filter and total_detections == 0:
+        filtered_names = ', '.join(SPECIES_LABELS.get(s, s) for s in species_filter)
+        return Response(f'Ei havaintoja: {filtered_names}.', mimetype='text/plain')
+
+    lines = []
+    period_start = range_start.strftime('%Y-%m-%d')
+    period_end = (range_end - timedelta(days=1)).strftime('%Y-%m-%d')
+    lines.append(f'Riistakamera {days}pv ({period_start} – {period_end})')
+    lines.append(
+        f'Kuvia: {total_images} | Havaintoja: {total_detections} | '
+        f'Tyhjiä: {empty_count} | Annotoimattomia: {unannotated_count}'
+    )
+
+    # Species sorted by count descending
+    sorted_species = sorted(species_counts.items(), key=lambda x: x[1], reverse=True)
+    species_str = ', '.join(f'{name} {count}' for name, count in sorted_species)
+    lines.append(f'Lajit: {species_str}')
+
+    # Top 3 active hours
+    sorted_hours = sorted(hourly_totals.items(), key=lambda x: x[1], reverse=True)
+    top_hours = sorted_hours[:3]
+    if top_hours:
+        hours_str = ', '.join(
+            f'{h:02d}-{(h + 1) % 24:02d} ({c})' for h, c in top_hours
+        )
+        lines.append(f'Aktiivisimmat: {hours_str}')
+
+    if detail == 'full':
+        # Full hourly breakdown
+        hour_parts = []
+        for h in range(24):
+            count = hourly_totals.get(h, 0)
+            hour_parts.append(f'{h:02d}:{count}')
+        lines.append(f'Tunnit: {" ".join(hour_parts)}')
+
+        # AI accuracy per species
+        if ai_accuracy:
+            acc_parts = []
+            for sp, acc in ai_accuracy.items():
+                label = SPECIES_LABELS.get(sp, sp).lower()
+                if acc['total'] > 0:
+                    pct = round(100 * acc['correct'] / acc['total'])
+                    acc_parts.append(f'{label} {pct}% ({acc["correct"]}/{acc["total"]})')
+            if acc_parts:
+                lines.append(f'AI-tarkkuus: {", ".join(acc_parts)}')
+
+    text = '\n'.join(lines) + '\n'
+    return Response(text, mimetype='text/plain')
+
+
 THUMBNAIL_DIR = DATA_DIR / 'thumbnails'
 
 

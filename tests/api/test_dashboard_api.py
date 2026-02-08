@@ -208,3 +208,55 @@ class TestThumbnailAPI:
     def test_thumbnail_not_found(self, client):
         resp = client.get('/api/thumbnail/nonexistent.jpg')
         assert resp.status_code == 404
+
+
+class TestAiBriefAPI:
+    """Test GET /api/ai/brief."""
+
+    def test_brief_default(self, client):
+        resp = client.get('/api/ai/brief?days=90')
+        assert resp.status_code == 200
+        assert resp.content_type.startswith('text/plain')
+        assert 'Riistakamera' in resp.data.decode('utf-8')
+
+    def test_brief_days_param(self, client):
+        resp = client.get('/api/ai/brief?days=90')
+        assert resp.status_code == 200
+        text = resp.data.decode('utf-8')
+        assert '90pv' in text
+        assert 'Havaintoja:' in text
+
+    def test_brief_species_filter(self, client):
+        resp = client.get('/api/ai/brief?days=90&species=janis')
+        assert resp.status_code == 200
+        text = resp.data.decode('utf-8')
+        assert 'jänis' in text
+        assert 'metsäkauris' not in text
+
+    def test_brief_detail_full(self, client):
+        resp = client.get('/api/ai/brief?days=90&detail=full')
+        assert resp.status_code == 200
+        text = resp.data.decode('utf-8')
+        assert 'Tunnit:' in text
+        assert 'AI-tarkkuus:' in text
+
+    def test_brief_invalid_days(self, client):
+        resp = client.get('/api/ai/brief?days=0')
+        assert resp.status_code == 400
+        resp2 = client.get('/api/ai/brief?days=91')
+        assert resp2.status_code == 400
+
+    def test_brief_empty_result(self, client):
+        resp = client.get('/api/ai/brief?days=90&species=ilves')
+        assert resp.status_code == 200
+        text = resp.data.decode('utf-8')
+        assert 'Ei havaintoja' in text or 'ilves' in text.lower()
+
+    def test_brief_token_count(self, client):
+        resp = client.get('/api/ai/brief?days=90')
+        text = resp.data.decode('utf-8')
+        assert len(text) < 500, f'Summary too long: {len(text)} chars'
+
+        resp_full = client.get('/api/ai/brief?days=90&detail=full')
+        text_full = resp_full.data.decode('utf-8')
+        assert len(text_full) < 800, f'Full detail too long: {len(text_full)} chars'

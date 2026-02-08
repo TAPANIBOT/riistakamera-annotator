@@ -1,51 +1,68 @@
 ---
 name: riistakamera
-description: Riistakameran kuvien hallinta — tilastot, havainnot, haku, annotaatiotilanne
+description: Riistakameran havaintotiedot — tilastot, lajit, vuorokausirytmi, trendit
 ---
 
 # Riistakamera-skill
 
-Hallinnoi riistakameran kuvia, tunnistuksia ja annotaatioita.
+Riistakameran havaintodata: lajitilastot, vuorokausirytmi, aktiivisimmat tunnit, AI-tarkkuus.
 
-## API-komennot
+## Komennot
 
-### Tilastot
+### Yhteenveto (oletus 7 päivää)
 ```bash
-curl -s http://localhost:5000/api/stats
+riista-api brief [days] [species] [detail]
 ```
-Palauttaa: total_images, annotated_images, empty_images, unannotated_images, predicted_images, species_counts.
+- `days` (1-90, oletus 7) — montako päivää taaksepäin
+- `species` — suodata lajiin, esim. `janis` tai `janis,kauris`
+- `detail` — `summary` (oletus) tai `full` (tunnit + AI-tarkkuus)
 
-### Viimeisimmät havainnot
+**Esimerkki:**
 ```bash
-curl -s http://localhost:5000/api/recent-detections
+riista-api brief 7          # viikon yhteenveto
+riista-api brief 30 "" full # kuukauden data, täydet tunnit + AI-tarkkuus
+riista-api brief 7 janis    # vain jänikset, 7pv
 ```
-Palauttaa: detections (kuvakohtaiset tunnistukset), species_summary (lajijakauma).
 
-### Hae uudet kuvat sähköpostista
+### Päiväkohtainen
 ```bash
-curl -s -X POST http://localhost:5000/api/fetch
+riista-api day [YYYY-MM-DD]
 ```
-Triggeroi sähköpostien haun ja tunnistuksen uusille kuville.
+Palauttaa yhden päivän tiedot. Ilman päivämäärää = tänään.
 
-### Epävarmuusjärjestys (active learning)
+### Palvelimen tila
 ```bash
-curl -s "http://localhost:5000/api/active-learning/ranking?limit=10"
+riista-api health
 ```
-Palauttaa kuvat jotka hyötyisivät eniten ihmisen annotaatiosta.
-
-### YOLO-eksportti
-```bash
-curl -s -X POST http://localhost:5000/api/export/yolo
-```
-Eksportoi annotaatiot YOLO-koulutusformaattiin.
 
 ## Vastausohjeet
 
-- Raportoi tilastot suomeksi: "Riistakamerassa on X kuvaa, joista Y annotoitu, Z tyhjää"
-- Lajijakaumasta mainitse yleisimmät lajit: "Yleisimmät: kauris (N kpl), peura (N kpl)"
-- Jos annotoimattomia on paljon, muistuta: "Annotaatio-UI: http://tapani---mac-mini.tail3d5d3c.ts.net:5000"
-- Hae uudet kuvat automaattisesti kun käyttäjä kysyy tilannetta
+- Raportoi suomeksi
+- Mainitse top 3 aktiivisimmat tunnit ja yleisimmät lajit
+- Jos annotoimattomia kuvia on paljon, muistuta: "Annotaatio-UI: http://tapani---mac-mini.tail3d5d3c.ts.net:5000/annotator"
+- Dashboard: http://tapani---mac-mini.tail3d5d3c.ts.net:5000/dashboard
+- Vastaus on plain text, voit lukea sen suoraan käyttäjälle
 
-## Annotaatio-UI
+## Lajikartta (API-nimi → suomenkielinen)
 
-Selaimella: `http://tapani---mac-mini.tail3d5d3c.ts.net:5000` tai `http://100.93.64.41:5000`
+| API-nimi | Suomeksi |
+|----------|----------|
+| kauris | Metsäkauris |
+| peura | Valkohäntäpeura |
+| janis | Jänis |
+| linnut | Linnut |
+| supikoira | Supikoira |
+| kettu | Kettu |
+| ihminen | Ihminen |
+| koira | Koira |
+| muu | Muu |
+
+## Esimerkkejä
+
+| Käyttäjä kysyy | Komento |
+|-----------------|---------|
+| "Mitä riistakameralla näkyy?" | `riista-api brief 7` |
+| "Onko jäniksiä näkynyt?" | `riista-api brief 14 janis` |
+| "Riistakameran kuukausiraportti" | `riista-api brief 30 "" full` |
+| "Mitä eilen näkyi?" | `riista-api day 2026-02-07` |
+| "Toimiiko riistakamera?" | `riista-api health` |
