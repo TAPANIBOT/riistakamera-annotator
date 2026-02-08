@@ -151,6 +151,14 @@ kbd {
     color: var(--text-secondary);
 }
 
+.hud-nav-link {
+    color: var(--text-muted);
+    transition: color 150ms;
+    display: flex;
+    align-items: center;
+}
+.hud-nav-link:hover { color: var(--accent-amber); }
+
 .hud-top__center {
     flex: 1;
     min-width: 100px;

@@ -4,8 +4,10 @@ Riistakamera Annotator - Flask backend
 Kuvien lataus, annotaatioiden tallennus, AI-ennusteet, YOLO-eksportti
 """
 import os
+import re
 import json
 from pathlib import Path
+from datetime import datetime
 from flask import Flask, render_template, jsonify, request, send_from_directory
 from PIL import Image
 
@@ -356,6 +358,167 @@ def recent_detections():
         'detections': detections,
         'species_summary': species_summary,
         'total': len(detections),
+    })
+
+
+SPECIES_LABELS = {
+    'kauris': 'Metsäkauris',
+    'peura': 'Valkohäntäpeura',
+    'janis': 'Jänis',
+    'linnut': 'Linnut',
+    'supikoira': 'Supikoira',
+    'kettu': 'Kettu',
+    'ihminen': 'Ihminen',
+    'koira': 'Koira',
+    'muu': 'Muu',
+}
+
+_FILENAME_DATE_RE = re.compile(r'(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})')
+
+
+def _parse_camera_datetime(filename):
+    """Parse camera date+time from filename like 15339_25173_20260128_072622867."""
+    m = _FILENAME_DATE_RE.search(filename)
+    if not m:
+        return None, None
+    y, mo, d, h, mi, s = (int(x) for x in m.groups())
+    try:
+        dt = datetime(y, mo, d, h, mi, s)
+        return dt.strftime('%Y-%m-%d'), dt.hour
+    except ValueError:
+        return None, None
+
+
+@app.route('/dashboard')
+def dashboard():
+    return render_template('dashboard.html')
+
+
+@app.route('/api/dashboard')
+def dashboard_data():
+    """Aggregated analytics data for the dashboard."""
+    # Query params
+    from_date = request.args.get('from_date', '')
+    to_date = request.args.get('to_date', '')
+    species_filter = set()
+    sp_param = request.args.get('species', '')
+    if sp_param:
+        species_filter = {s.strip() for s in sp_param.split(',') if s.strip()}
+
+    images = get_image_files()
+
+    total_images = len(images)
+    annotated_count = 0
+    empty_count = 0
+    unannotated_count = 0
+    total_annotations = 0
+    species_counts = {}
+    hourly_activity = {}     # hour -> {species: count}
+    daily_activity = {}      # date -> {species: count}
+    ai_accuracy = {}         # species -> {correct, overridden, total}
+    confidence_bins = [0] * 10  # 0-10%, 10-20%, ..., 90-100%
+    recent = []
+    from_prediction_total = 0
+
+    for img_name in images:
+        camera_date, camera_hour = _parse_camera_datetime(img_name)
+
+        # Date filtering
+        if from_date and camera_date and camera_date < from_date:
+            continue
+        if to_date and camera_date and camera_date > to_date:
+            continue
+
+        ann_path = get_annotation_path(img_name)
+        if not ann_path.exists():
+            unannotated_count += 1
+            continue
+
+        with open(ann_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        if data.get('is_empty', False):
+            empty_count += 1
+            continue
+
+        anns = data.get('annotations', [])
+        if not anns:
+            unannotated_count += 1
+            continue
+
+        annotated_count += 1
+
+        for ann in anns:
+            sp = ann.get('species', 'muu')
+
+            # Species filter
+            if species_filter and sp not in species_filter:
+                continue
+
+            total_annotations += 1
+            species_counts[sp] = species_counts.get(sp, 0) + 1
+
+            # Hourly activity
+            if camera_hour is not None:
+                h_key = str(camera_hour)
+                if h_key not in hourly_activity:
+                    hourly_activity[h_key] = {}
+                hourly_activity[h_key][sp] = hourly_activity[h_key].get(sp, 0) + 1
+
+            # Daily activity
+            if camera_date:
+                if camera_date not in daily_activity:
+                    daily_activity[camera_date] = {}
+                daily_activity[camera_date][sp] = daily_activity[camera_date].get(sp, 0) + 1
+
+            # AI accuracy
+            if ann.get('from_prediction'):
+                from_prediction_total += 1
+                original = ann.get('original_species', '')
+                if sp not in ai_accuracy:
+                    ai_accuracy[sp] = {'correct': 0, 'overridden': 0, 'total': 0}
+                ai_accuracy[sp]['total'] += 1
+                if original == sp:
+                    ai_accuracy[sp]['correct'] += 1
+                else:
+                    ai_accuracy[sp]['overridden'] += 1
+
+            # Confidence histogram
+            conf = ann.get('species_confidence') or ann.get('md_confidence')
+            if conf is not None:
+                bin_idx = min(int(conf * 10), 9)
+                confidence_bins[bin_idx] += 1
+
+            # Recent feed
+            recent.append({
+                'image': img_name,
+                'species': sp,
+                'camera_date': camera_date,
+                'camera_hour': camera_hour,
+                'confidence': ann.get('species_confidence') or ann.get('md_confidence'),
+                'from_prediction': ann.get('from_prediction', False),
+                'timestamp': ann.get('timestamp', ''),
+            })
+
+    # Sort recent by timestamp descending, keep 20
+    recent.sort(key=lambda r: r.get('timestamp', ''), reverse=True)
+    recent = recent[:20]
+
+    return jsonify({
+        'total_images': total_images,
+        'annotated_count': annotated_count,
+        'empty_count': empty_count,
+        'unannotated_count': unannotated_count,
+        'total_annotations': total_annotations,
+        'unique_species': len(species_counts),
+        'species_counts': species_counts,
+        'hourly_activity': hourly_activity,
+        'daily_activity': daily_activity,
+        'ai_accuracy': ai_accuracy,
+        'ai_from_prediction_total': from_prediction_total,
+        'confidence_bins': confidence_bins,
+        'recent': recent,
+        'species_labels': SPECIES_LABELS,
     })
 
 

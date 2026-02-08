@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Riista — Analytiikka</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/dashboard.css">
+</head>
+<body class="dashboard-body">
+
+    <!-- TOP BAR -->
+    <header class="hud-top">
+        <div class="hud-top__left">
+            <a href="/" class="hud-nav-link" title="Annotaattori">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+            </a>
+            <span class="hud-logo">RIISTA</span>
+            <span class="hud-separator">/</span>
+            <span class="hud-subtitle">Analytiikka</span>
+        </div>
+        <div class="hud-top__right">
+            <span class="hud-badge" id="update-time">—</span>
+        </div>
+    </header>
+
+    <!-- FILTERS -->
+    <section class="dash-filters">
+        <div class="dash-filters__row">
+            <div class="dash-filters__dates">
+                <label class="dash-filter-label">Aikajakso</label>
+                <input type="date" id="filter-from" class="dash-date-input" title="Alkaen">
+                <span class="dash-filter-sep">—</span>
+                <input type="date" id="filter-to" class="dash-date-input" title="Saakka">
+            </div>
+            <div class="dash-filters__species" id="species-chips"></div>
+            <div class="dash-filters__actions">
+                <button class="dash-btn dash-btn--primary" id="btn-refresh" title="Päivitä">Päivitä</button>
+                <button class="dash-btn" id="btn-reset" title="Nollaa suodattimet">Nollaa</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- SCROLLABLE CONTENT -->
+    <div class="dash-scroll">
+
+        <!-- KPI CARDS -->
+        <div class="dash-kpi-grid">
+            <div class="dash-kpi">
+                <div class="dash-kpi__value" id="kpi-total">—</div>
+                <div class="dash-kpi__label">Kuvia yhteensä</div>
+            </div>
+            <div class="dash-kpi">
+                <div class="dash-kpi__value" id="kpi-annotated">—</div>
+                <div class="dash-kpi__label">Annotoitu</div>
+            </div>
+            <div class="dash-kpi">
+                <div class="dash-kpi__value" id="kpi-empty">—</div>
+                <div class="dash-kpi__label">Tyhjiä kuvia</div>
+            </div>
+            <div class="dash-kpi">
+                <div class="dash-kpi__value" id="kpi-species">—</div>
+                <div class="dash-kpi__label">Eri lajeja</div>
+            </div>
+            <div class="dash-kpi">
+                <div class="dash-kpi__value" id="kpi-annotations">—</div>
+                <div class="dash-kpi__label">Havaintoja</div>
+            </div>
+            <div class="dash-kpi">
+                <div class="dash-kpi__value" id="kpi-accuracy">—</div>
+                <div class="dash-kpi__label">AI-tarkkuus</div>
+            </div>
+        </div>
+
+        <!-- ROW 1: Species + Hourly -->
+        <div class="dash-grid-2">
+            <div class="dash-card">
+                <div class="dash-card__header">
+                    <h3>Lajien jakauma</h3>
+                </div>
+                <div class="dash-card__body dash-card__body--chart">
+                    <canvas id="chart-species"></canvas>
+                </div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-card__header">
+                    <h3>Vuorokausirytmi</h3>
+                    <span class="dash-card__hint">Milloin eläimet liikkuvat</span>
+                </div>
+                <div class="dash-card__body dash-card__body--chart">
+                    <canvas id="chart-hourly"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROW 2: Calendar + AI Accuracy -->
+        <div class="dash-grid-2">
+            <div class="dash-card">
+                <div class="dash-card__header">
+                    <h3>Havaintokalenteri</h3>
+                    <span class="dash-card__hint">Päivittäiset havainnot</span>
+                </div>
+                <div class="dash-card__body dash-card__body--chart">
+                    <canvas id="chart-calendar"></canvas>
+                </div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-card__header">
+                    <h3>AI-mallin suorituskyky</h3>
+                    <span class="dash-card__hint">Ihminen vs. AI per laji</span>
+                </div>
+                <div class="dash-card__body dash-card__body--chart">
+                    <canvas id="chart-ai"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROW 3: Confidence -->
+        <div class="dash-grid-1">
+            <div class="dash-card">
+                <div class="dash-card__header">
+                    <h3>Luottamusjakauma</h3>
+                    <span class="dash-card__hint">AI-ennusteiden varmuus</span>
+                </div>
+                <div class="dash-card__body dash-card__body--chart dash-card__body--short">
+                    <canvas id="chart-confidence"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- RECENT FEED -->
+        <div class="dash-card">
+            <div class="dash-card__header">
+                <h3>Viimeisimmät havainnot</h3>
+            </div>
+            <div class="dash-card__body">
+                <div class="dash-feed" id="recent-feed"></div>
+            </div>
+        </div>
+
+    </div><!-- /dash-scroll -->
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="/static/dashboard.js"></script>
+</body>
+</html>
