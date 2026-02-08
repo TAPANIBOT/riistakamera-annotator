@@ -12,12 +12,18 @@ services:
       - IMAGE_DIR=/data/images/incoming
       - ANNOTATION_DIR=/data/annotations
       - PREDICTION_DIR=/data/predictions
-      - GMAIL_AGENT_URL=http://gmail-agent:8000
+      - GMAIL_USER=tapani@skyplanner.ai
       - FETCH_INTERVAL_SECONDS=1800
+    secrets:
+      - gmail_app_password
     networks:
       - agent-network
     mem_limit: 6g
     cpus: 2.0
+
+secrets:
+  gmail_app_password:
+    file: ${HOME}/secrets/gmail-agent_secrets.yaml
 
 volumes:
   wildlife-data:

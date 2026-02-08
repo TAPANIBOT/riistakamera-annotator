@@ -88,6 +88,9 @@ async function init() {
     // Keyboard
     document.addEventListener('keydown', handleKeyboard);
 
+    // Fetch button
+    document.getElementById('fetch-btn').addEventListener('click', fetchNewImages);
+
     // Training UI
     initTrainingUI();
 
@@ -977,6 +980,46 @@ async function pollTrainingStatus() {
         }
     } catch {
         // Network error, keep polling
+    }
+}
+
+// ===================== FETCH NEW IMAGES =====================
+
+async function fetchNewImages() {
+    const btn = document.getElementById('fetch-btn');
+    btn.disabled = true;
+    btn.textContent = '...';
+    showStatus('Haetaan uusia kuvia sähköpostista...', 'success');
+
+    try {
+        const resp = await fetch('/api/fetch', { method: 'POST' });
+        const data = await resp.json();
+
+        if (!resp.ok) {
+            showStatus(data.error || 'Haku epäonnistui', 'error');
+            return;
+        }
+
+        const fetched = data.fetched || 0;
+        const detection = data.detection;
+
+        if (fetched > 0) {
+            let msg = `${fetched} uutta kuvaa haettu`;
+            if (detection && detection.detected) {
+                msg += `, ${detection.detected} tunnistettu`;
+            }
+            showStatus(msg, 'success');
+            // Lataa kuvalista uudelleen
+            await loadImages();
+            await loadStats();
+        } else {
+            showStatus('Ei uusia kuvia', 'success');
+        }
+    } catch (err) {
+        showStatus('Yhteysvirhe haussa', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '\u2709';
     }
 }
 

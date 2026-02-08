@@ -303,9 +303,9 @@ def train_status():
 
 @app.route('/api/fetch', methods=['POST'])
 def fetch_images():
-    """Triggeroi sähköpostinouto + tunnistus."""
+    """Triggeroi sähköpostinouto + tunnistus (suora IMAP, ei Gmail-agenttia)."""
     try:
-        from ingestion.fetch_camera_emails import fetch_camera_images
+        from ingestion.fetch_camera_imap import fetch_camera_images
         result = fetch_camera_images()
     except Exception as e:
         return jsonify({'error': f'Sähköpostihaku epäonnistui: {e}'}), 500
