@@ -348,6 +348,22 @@ function updateSessionTimer() {
 async function advanceAfterSave() {
     if (!state.autoAdvance) return;
 
+    // Check stats to see if everything is annotated
+    try {
+        const statsResp = await fetch('/api/stats');
+        const stats = await statsResp.json();
+        state.stats = stats;
+        updateProgress();
+
+        const annotated = stats.annotated_images + stats.empty_images;
+        if (annotated >= stats.total_images) {
+            document.getElementById('no-images').textContent = 'Kaikki kuvat annotoitu!';
+            document.getElementById('no-images').style.display = 'flex';
+            checkTrainingReady();
+            return;
+        }
+    } catch {}
+
     if (state.filter !== 'all') {
         const filterParam = `?filter=${state.filter}`;
         try {
@@ -356,9 +372,8 @@ async function advanceAfterSave() {
             state.images = data.images || [];
 
             if (state.images.length === 0) {
-                document.getElementById('no-images').textContent = 'Kaikki kuvat annotoitu!';
+                document.getElementById('no-images').textContent = 'Kaikki suodatetut kuvat annotoitu!';
                 document.getElementById('no-images').style.display = 'flex';
-                updateProgress();
                 return;
             }
 
