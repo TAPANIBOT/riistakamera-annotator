@@ -11,7 +11,7 @@ Riistakameran havaintodata: lajitilastot, vuorokausirytmi, aktiivisimmat tunnit,
 
 ### Yhteenveto (oletus 7 päivää)
 ```bash
-riista-api brief [days] [species] [detail]
+~/.openclaw/bin/riista-api brief [days] [species] [detail]
 ```
 - `days` (1-90, oletus 7) — montako päivää taaksepäin
 - `species` — suodata lajiin, esim. `janis` tai `janis,kauris`
@@ -19,20 +19,20 @@ riista-api brief [days] [species] [detail]
 
 **Esimerkki:**
 ```bash
-riista-api brief 7          # viikon yhteenveto
-riista-api brief 30 "" full # kuukauden data, täydet tunnit + AI-tarkkuus
-riista-api brief 7 janis    # vain jänikset, 7pv
+~/.openclaw/bin/riista-api brief 7          # viikon yhteenveto
+~/.openclaw/bin/riista-api brief 30 "" full # kuukauden data, täydet tunnit + AI-tarkkuus
+~/.openclaw/bin/riista-api brief 7 janis    # vain jänikset, 7pv
 ```
 
 ### Päiväkohtainen
 ```bash
-riista-api day [YYYY-MM-DD]
+~/.openclaw/bin/riista-api day [YYYY-MM-DD]
 ```
 Palauttaa yhden päivän tiedot. Ilman päivämäärää = tänään.
 
 ### Palvelimen tila
 ```bash
-riista-api health
+~/.openclaw/bin/riista-api health
 ```
 
 ## Vastausohjeet
@@ -61,8 +61,8 @@ riista-api health
 
 | Käyttäjä kysyy | Komento |
 |-----------------|---------|
-| "Mitä riistakameralla näkyy?" | `riista-api brief 7` |
-| "Onko jäniksiä näkynyt?" | `riista-api brief 14 janis` |
-| "Riistakameran kuukausiraportti" | `riista-api brief 30 "" full` |
-| "Mitä eilen näkyi?" | `riista-api day 2026-02-07` |
-| "Toimiiko riistakamera?" | `riista-api health` |
+| "Mitä riistakameralla näkyy?" | `~/.openclaw/bin/riista-api brief 7` |
+| "Onko jäniksiä näkynyt?" | `~/.openclaw/bin/riista-api brief 14 janis` |
+| "Riistakameran kuukausiraportti" | `~/.openclaw/bin/riista-api brief 30 "" full` |
+| "Mitä eilen näkyi?" | `~/.openclaw/bin/riista-api day 2026-02-07` |
+| "Toimiiko riistakamera?" | `~/.openclaw/bin/riista-api health` |
