@@ -220,7 +220,7 @@ def fetch_camera_images():
     try:
         search_result = gmail_api_call('search_emails', {
             'query': 'from:linckeazi.com',
-            'max_results': 50,
+            'max_results': 200,
         })
     except Exception as e:
         results['errors'].append(f'Gmail-haku epäonnistui: {e}')
