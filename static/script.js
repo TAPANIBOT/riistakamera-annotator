@@ -194,6 +194,12 @@ function selectSpecies(species) {
         btn.classList.toggle('active', btn.dataset.species === species);
     });
 
+    // If user drew a box, save it with this species
+    if (state.currentBox) {
+        saveCurrentAnnotation();
+        return;
+    }
+
     // If predictions exist, override species and accept all immediately
     if (state.predictions.length > 0) {
         const overrideEl = document.getElementById('pred-override');
