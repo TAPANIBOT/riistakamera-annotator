@@ -101,6 +101,11 @@ def get_prediction_path(image_name):
 
 @app.route('/')
 def index():
+    return render_template('dashboard.html')
+
+
+@app.route('/annotator')
+def annotator():
     return render_template('index.html')
 
 
@@ -387,11 +392,6 @@ def _parse_camera_datetime(filename):
         return dt.strftime('%Y-%m-%d'), dt.hour
     except ValueError:
         return None, None
-
-
-@app.route('/dashboard')
-def dashboard():
-    return render_template('dashboard.html')
 
 
 @app.route('/api/dashboard')

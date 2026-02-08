@@ -158,6 +158,22 @@
     border-color: rgba(245, 183, 49, 0.5);
 }
 
+.dash-btn--annotator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    background: rgba(52, 211, 153, 0.1);
+    border-color: rgba(52, 211, 153, 0.3);
+    color: var(--accent-green);
+}
+
+.dash-btn--annotator:hover {
+    background: rgba(52, 211, 153, 0.18);
+    border-color: rgba(52, 211, 153, 0.5);
+    color: var(--accent-green);
+}
+
 /* ---- SCROLLABLE CONTENT ---- */
 .dash-scroll {
     max-width: 1400px;
