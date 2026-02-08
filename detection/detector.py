@@ -93,11 +93,20 @@ class WildlifeDetector:
         """Lataa SpeciesNet crop classifier lajintunnistukseen."""
         try:
             from speciesnet.classifier import SpeciesNetClassifier
-            print("Ladataan SpeciesNet crop classifier...")
-            self.speciesnet_classifier = SpeciesNetClassifier(
-                model_name="kaggle:google/speciesnet/pyTorch/v4.0.2a/1",
-                device="cpu",
-            )
+            # Yritä ensin pysyvä polku (Docker volume)
+            local_model = Path(os.environ.get('DATA_DIR', '/data')) / 'models' / 'speciesnet'
+            if (local_model / 'always_crop_99710272_22x8_v12_epoch_00148.pt').exists():
+                print(f"Ladataan SpeciesNet paikallisesta: {local_model}")
+                self.speciesnet_classifier = SpeciesNetClassifier(
+                    model_name=str(local_model),
+                    device="cpu",
+                )
+            else:
+                print("Ladataan SpeciesNet Kagglesta...")
+                self.speciesnet_classifier = SpeciesNetClassifier(
+                    model_name="kaggle:google/speciesnet/pyTorch/v4.0.2a/1",
+                    device="cpu",
+                )
             print("SpeciesNet ladattu.")
         except Exception as e:
             print(f"SpeciesNet-lataus epäonnistui: {e}")
