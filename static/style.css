@@ -80,6 +80,8 @@ kbd {
     align-items: center;
     justify-content: center;
     z-index: 0;
+    /* Reserve space for HUD bars so image is never obscured */
+    padding: var(--hud-top-h) 56px var(--hud-bottom-h) 56px;
 }
 
 #image-canvas {
