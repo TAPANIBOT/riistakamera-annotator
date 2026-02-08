@@ -545,6 +545,158 @@ body {
     animation: fadeIn 400ms var(--ease-out-expo) 40ms both;
 }
 
+/* --- QUICK ACTION BAR --- */
+.quickbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.quickbar::-webkit-scrollbar { display: none; }
+
+.quickbar__species {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+}
+
+.quickbar__actions {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+/* Species pill */
+.qb-pill {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px 3px 4px;
+    font-family: 'Sora', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: 20px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 100ms;
+    line-height: 1;
+}
+
+.qb-pill:hover {
+    background: var(--bg-overlay);
+    color: var(--text-primary);
+    border-color: var(--border-default);
+}
+
+.qb-pill:active {
+    transform: scale(0.96);
+}
+
+.qb-pill.active {
+    background: rgba(240, 168, 40, 0.15);
+    border-color: var(--accent-amber);
+    color: var(--accent-amber);
+    box-shadow: 0 0 10px rgba(240, 168, 40, 0.12);
+}
+
+.qb-pill__key {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-overlay);
+    border-radius: 50%;
+    flex-shrink: 0;
+    color: var(--text-muted);
+    line-height: 1;
+}
+
+.qb-pill.active .qb-pill__key {
+    background: rgba(240, 168, 40, 0.25);
+    color: var(--accent-amber);
+}
+
+/* Empty button */
+.qb-empty {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px 3px 4px;
+    font-family: 'Sora', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: 20px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 100ms;
+    line-height: 1;
+}
+
+.qb-empty:hover {
+    color: var(--text-secondary);
+    border-color: var(--border-default);
+}
+
+/* Save button */
+.qb-save {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 14px 4px 10px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-green);
+    background: rgba(63, 185, 80, 0.1);
+    border: 1px solid rgba(63, 185, 80, 0.35);
+    border-radius: 20px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 120ms;
+    line-height: 1;
+}
+
+.qb-save:hover {
+    background: rgba(63, 185, 80, 0.2);
+    box-shadow: 0 0 14px rgba(63, 185, 80, 0.15);
+    border-color: var(--accent-green);
+}
+
+.qb-save:active {
+    transform: scale(0.96);
+}
+
+.qb-save__icon {
+    font-size: 13px;
+    line-height: 1;
+}
+
+/* Save button pulse when predictions exist (visual cue: "ready to save") */
+.qb-save.qb-save--ready {
+    animation: savePulse 2.4s ease-in-out infinite;
+}
+
+@keyframes savePulse {
+    0%, 100% { box-shadow: 0 0 4px rgba(63, 185, 80, 0.1); }
+    50% { box-shadow: 0 0 18px rgba(63, 185, 80, 0.3); }
+}
+
 .canvas-container {
     flex: 1;
     display: flex;

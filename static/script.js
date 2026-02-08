@@ -91,10 +91,17 @@ async function init() {
         if (e.target === e.currentTarget) toggleShortcuts();
     });
 
-    // Species buttons
+    // Species buttons (left panel + quickbar)
     document.querySelectorAll('.species-btn').forEach(btn => {
         btn.addEventListener('click', () => selectSpecies(btn.dataset.species));
     });
+    document.querySelectorAll('.qb-pill[data-species]').forEach(btn => {
+        btn.addEventListener('click', () => selectSpecies(btn.dataset.species));
+    });
+
+    // Quickbar save & empty
+    document.getElementById('qb-save-btn').addEventListener('click', saveCurrentAnnotation);
+    document.getElementById('qb-empty-btn').addEventListener('click', markAsEmpty);
 
     // Mobile drawer toggles
     document.getElementById('drawer-toggle-left').addEventListener('click', () => {
@@ -124,12 +131,12 @@ async function init() {
     // Session timer
     session.timerInterval = setInterval(updateSessionTimer, 1000);
 
-    // Check if we should default to 'predicted' filter
+    // Default to 'predicted' filter when there are unannotated predictions
     try {
         const statsResp = await fetch('/api/stats');
         const stats = await statsResp.json();
         state.stats = stats;
-        if (stats.predicted_images > 0 && stats.annotated_images === 0 && stats.empty_images === 0) {
+        if (stats.predicted_images > 0 && stats.unannotated_images > 0) {
             state.filter = 'predicted';
             document.getElementById('filter-select').value = 'predicted';
         }
@@ -220,7 +227,12 @@ function handleKeyboard(e) {
 
 function selectSpecies(species) {
     state.selectedSpecies = species;
+    // Sync left panel
     document.querySelectorAll('.species-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.species === species);
+    });
+    // Sync quickbar
+    document.querySelectorAll('.qb-pill[data-species]').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.species === species);
     });
 }
@@ -653,39 +665,45 @@ function drawMinimap() {
 // ===================== ANNOTATIONS =====================
 
 function saveCurrentAnnotation() {
-    if (!state.currentBox) {
-        showStatus('Piirrä ensin laatikko!', 'warning');
+    // CASE 1: User drew a box — save it with selected species
+    if (state.currentBox) {
+        const species = state.selectedSpecies;
+        if (!species) {
+            showStatus('Valitse eläinlaji!', 'warning');
+            return;
+        }
+
+        pushHistory();
+
+        state.annotations.push({
+            bbox: state.currentBox.map(Math.round),
+            species: species,
+            timestamp: new Date().toISOString()
+        });
+
+        state.currentBox = null;
+        state.isEmptyImage = false;
+
+        saveAnnotationsToServer();
+        updateAnnotationsList();
+        drawCanvas();
+
+        session.annotatedCount++;
+        showStatus(`Tallennettu: ${SPECIES_LABELS[species]}`, 'success');
+
+        advanceAfterSave();
+        loadStats();
         return;
     }
 
-    const species = state.selectedSpecies;
-    if (!species) {
-        showStatus('Valitse eläinlaji!', 'warning');
+    // CASE 2: No drawn box but AI predictions exist — accept all predictions
+    if (state.predictions.length > 0) {
+        acceptAllPredictions();
         return;
     }
 
-    pushHistory();
-
-    const annotation = {
-        bbox: state.currentBox.map(Math.round),
-        species: species,
-        timestamp: new Date().toISOString()
-    };
-
-    state.annotations.push(annotation);
-    state.currentBox = null;
-    state.isEmptyImage = false;
-
-    saveAnnotationsToServer();
-    updateAnnotationsList();
-    drawCanvas();
-
-    session.annotatedCount++;
-
-    showStatus(`Tallennettu: ${SPECIES_LABELS[species]}`, 'success');
-
-    advanceAfterSave();
-    loadStats();
+    // CASE 3: Nothing to save
+    showStatus('Piirrä laatikko tai hyväksy ennusteet', 'warning');
 }
 
 function deleteAnnotation(index) {
@@ -865,6 +883,7 @@ function updatePredictionsList() {
 
     if (state.predictions.length === 0) {
         container.innerHTML = '<p class="no-data">Ei AI-ennusteita</p>';
+        updateSaveButtonState();
         return;
     }
 
@@ -905,6 +924,13 @@ function updatePredictionsList() {
         `;
         container.appendChild(div);
     });
+    updateSaveButtonState();
+}
+
+function updateSaveButtonState() {
+    const saveBtn = document.getElementById('qb-save-btn');
+    if (!saveBtn) return;
+    saveBtn.classList.toggle('qb-save--ready', state.predictions.length > 0);
 }
 
 function updatePredictionsFocus() {

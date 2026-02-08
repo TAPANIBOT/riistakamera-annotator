@@ -123,6 +123,30 @@
 
     <!-- CANVAS AREA -->
     <main class="canvas-area">
+        <!-- QUICK ACTION BAR -->
+        <div class="quickbar" id="quickbar">
+            <div class="quickbar__species" id="quickbar-species">
+                <button class="qb-pill" data-species="kauris"><span class="qb-pill__key">1</span>Kauris</button>
+                <button class="qb-pill" data-species="peura"><span class="qb-pill__key">2</span>Peura</button>
+                <button class="qb-pill" data-species="janis"><span class="qb-pill__key">3</span>Jänis</button>
+                <button class="qb-pill" data-species="linnut"><span class="qb-pill__key">4</span>Linnut</button>
+                <button class="qb-pill" data-species="supikoira"><span class="qb-pill__key">5</span>Supi</button>
+                <button class="qb-pill" data-species="kettu"><span class="qb-pill__key">6</span>Kettu</button>
+                <button class="qb-pill" data-species="ihminen"><span class="qb-pill__key">7</span>Ihminen</button>
+                <button class="qb-pill" data-species="koira"><span class="qb-pill__key">8</span>Koira</button>
+                <button class="qb-pill" data-species="muu"><span class="qb-pill__key">9</span>Muu</button>
+            </div>
+            <div class="quickbar__actions">
+                <button class="qb-empty" id="qb-empty-btn" title="Tyhjä kuva (E)">
+                    <span class="qb-pill__key">E</span>Tyhjä
+                </button>
+                <button class="qb-save" id="qb-save-btn" title="Tallenna (S / Enter)">
+                    <span class="qb-save__icon">&#10003;</span>
+                    <span class="qb-save__label">Tallenna</span>
+                </button>
+            </div>
+        </div>
+
         <div class="canvas-container" id="canvas-container">
             <canvas id="image-canvas"></canvas>
             <div class="canvas-overlay" id="loading">Ladataan kuvia...</div>
@@ -179,8 +203,8 @@
             <div class="shortcuts-grid">
                 <div class="shortcuts-col">
                     <h4>Annotaatio</h4>
-                    <div class="shortcut-row"><kbd>Enter</kbd><span>Tallenna annotaatio</span></div>
-                    <div class="shortcut-row"><kbd>S</kbd><span>Tallenna annotaatio</span></div>
+                    <div class="shortcut-row"><kbd>Enter</kbd><span>Tallenna / hyväksy AI</span></div>
+                    <div class="shortcut-row"><kbd>S</kbd><span>Tallenna / hyväksy AI</span></div>
                     <div class="shortcut-row"><kbd>1-9</kbd><span>Valitse laji</span></div>
                     <div class="shortcut-row"><kbd>C</kbd><span>Tyhjennä piirto</span></div>
                     <div class="shortcut-row"><kbd>E</kbd><span>Tyhjä kuva</span></div>
