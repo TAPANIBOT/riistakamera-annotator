@@ -452,6 +452,7 @@ def dashboard_data():
         if species_filter:
             has_match = any(ann.get('species', 'muu') in species_filter for ann in anns)
             if not has_match:
+                total_images -= 1
                 continue
 
         annotated_count += 1

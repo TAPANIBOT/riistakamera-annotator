@@ -105,6 +105,9 @@ class TestDashboardDataCorrectness:
         data = resp.get_json()
         # Only 1 image has janis annotation
         assert data['annotated_count'] == 1
+        # Counts must still add up
+        total = data['annotated_count'] + data['empty_count'] + data['unannotated_count']
+        assert total == data['total_images']
 
     def test_day_view_has_unique_images(self, client):
         """Bug fix: day view returns unique_images count."""
