@@ -12,7 +12,7 @@ services:
       - IMAGE_DIR=/data/images/incoming
       - ANNOTATION_DIR=/data/annotations
       - PREDICTION_DIR=/data/predictions
-      - GMAIL_AGENT_URL=http://gmail-agent:8001
+      - GMAIL_AGENT_URL=http://gmail-agent:8000
       - FETCH_INTERVAL_SECONDS=1800
     networks:
       - agent-network
