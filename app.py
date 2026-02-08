@@ -236,6 +236,71 @@ def export_yolo():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/train', methods=['POST'])
+def train_model():
+    """Eksportoi dataset + kouluta YOLO-malli."""
+    import threading
+
+    # Check if already training
+    if getattr(app, '_training_in_progress', False):
+        return jsonify({'error': 'Koulutus on jo käynnissä'}), 409
+
+    def run_training():
+        app._training_in_progress = True
+        app._training_status = 'exporting'
+        try:
+            # Step 1: Export YOLO dataset
+            from export_yolo import export_dataset
+            export_result = export_dataset(
+                annotation_dir=str(ANNOTATION_DIR),
+                image_dir=str(IMAGE_DIR),
+                output_dir=str(DATA_DIR / 'dataset'),
+                class_map=CLASS_MAP,
+                species_to_id=SPECIES_TO_ID,
+            )
+            if not export_result.get('success'):
+                app._training_status = f'error: {export_result.get("error", "export failed")}'
+                return
+
+            app._training_status = 'training'
+
+            # Step 2: Train model (CPU in Docker)
+            from training.train import train_species_model
+            train_result = train_species_model(
+                dataset_yaml=str(DATA_DIR / 'dataset' / 'dataset.yaml'),
+                base_model='yolo11n.pt',
+                epochs=50,
+                imgsz=640,
+                batch=4,
+                device='cpu',
+                patience=15,
+            )
+            if train_result.get('success'):
+                app._training_status = 'done'
+                app._training_result = train_result
+            else:
+                app._training_status = f'error: {train_result.get("error", "training failed")}'
+        except Exception as e:
+            app._training_status = f'error: {str(e)}'
+        finally:
+            app._training_in_progress = False
+
+    thread = threading.Thread(target=run_training, daemon=True)
+    thread.start()
+
+    return jsonify({'success': True, 'message': 'Koulutus käynnistetty'})
+
+
+@app.route('/api/train/status')
+def train_status():
+    """Koulutuksen tila."""
+    return jsonify({
+        'in_progress': getattr(app, '_training_in_progress', False),
+        'status': getattr(app, '_training_status', 'idle'),
+        'result': getattr(app, '_training_result', None),
+    })
+
+
 @app.route('/api/fetch', methods=['POST'])
 def fetch_images():
     """Triggeroi sähköpostinouto + tunnistus."""

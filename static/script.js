@@ -88,6 +88,9 @@ async function init() {
     // Keyboard
     document.addEventListener('keydown', handleKeyboard);
 
+    // Training UI
+    initTrainingUI();
+
     // Image onload
     img.onload = () => {
         state.imgWidth = img.naturalWidth;
@@ -303,6 +306,7 @@ async function loadStats() {
         const resp = await fetch('/api/stats');
         state.stats = await resp.json();
         updateProgress();
+        checkTrainingReady();
     } catch {}
 }
 
@@ -870,6 +874,95 @@ function drawEmptyOverlay() {
     ctx.fillText('TYHJÄ KUVA', img.naturalWidth / 2, img.naturalHeight / 2);
     ctx.textAlign = 'start';
     ctx.textBaseline = 'alphabetic';
+}
+
+// ===================== TRAINING =====================
+
+const TRAIN_THRESHOLD = 50;
+let trainBannerDismissed = false;
+let trainingPollInterval = null;
+
+function checkTrainingReady() {
+    if (trainBannerDismissed || !state.stats) return;
+    const annotated = state.stats.annotated_images + state.stats.empty_images;
+    const banner = document.getElementById('train-banner');
+    if (!banner) return;
+
+    if (annotated >= TRAIN_THRESHOLD) {
+        const textEl = document.getElementById('train-banner-text');
+        textEl.textContent = `${annotated} kuvaa annotoitu — valmis koulutukseen!`;
+        banner.style.display = 'flex';
+    }
+}
+
+function initTrainingUI() {
+    const btn = document.getElementById('train-btn');
+    const closeBtn = document.getElementById('train-banner-close');
+    if (!btn || !closeBtn) return;
+
+    btn.addEventListener('click', startTraining);
+    closeBtn.addEventListener('click', () => {
+        document.getElementById('train-banner').style.display = 'none';
+        trainBannerDismissed = true;
+    });
+}
+
+async function startTraining() {
+    const btn = document.getElementById('train-btn');
+    const textEl = document.getElementById('train-banner-text');
+    btn.disabled = true;
+    btn.textContent = 'Käynnistetään...';
+    textEl.textContent = 'Eksportoidaan dataa...';
+
+    try {
+        const resp = await fetch('/api/train', { method: 'POST' });
+        const data = await resp.json();
+        if (!resp.ok) {
+            textEl.textContent = data.error || 'Virhe käynnistyksessä';
+            btn.disabled = false;
+            btn.textContent = 'Yritä uudelleen';
+            return;
+        }
+        // Poll for status
+        trainingPollInterval = setInterval(pollTrainingStatus, 3000);
+    } catch (err) {
+        textEl.textContent = 'Yhteysvirhe';
+        btn.disabled = false;
+        btn.textContent = 'Yritä uudelleen';
+    }
+}
+
+async function pollTrainingStatus() {
+    const textEl = document.getElementById('train-banner-text');
+    const btn = document.getElementById('train-btn');
+    try {
+        const resp = await fetch('/api/train/status');
+        const data = await resp.json();
+
+        if (data.status === 'exporting') {
+            textEl.textContent = 'Eksportoidaan YOLO-datasettia...';
+        } else if (data.status === 'training') {
+            textEl.textContent = 'Koulutetaan mallia (tämä kestää hetken)...';
+        } else if (data.status === 'done') {
+            clearInterval(trainingPollInterval);
+            textEl.textContent = 'Koulutus valmis!';
+            btn.textContent = 'Valmis';
+            btn.disabled = true;
+            showStatus('Malli koulutettu!', 'success');
+        } else if (data.status.startsWith('error')) {
+            clearInterval(trainingPollInterval);
+            textEl.textContent = data.status;
+            btn.disabled = false;
+            btn.textContent = 'Yritä uudelleen';
+        }
+
+        if (!data.in_progress && data.status !== 'done' && !data.status.startsWith('error')) {
+            // Idle — stop polling
+            clearInterval(trainingPollInterval);
+        }
+    } catch {
+        // Network error, keep polling
+    }
 }
 
 // ===================== ACTIVE LEARNING =====================
