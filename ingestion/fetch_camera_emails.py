@@ -206,8 +206,7 @@ def make_target_path(subject, email_date):
 def fetch_camera_images():
     """Hae uudet riistakamerakuvat sähköpostista.
 
-    Gmail-agentti palauttaa max 20 tulosta per haku, joten tehdään useita
-    hakuja eri aikavälein kattavan haun saamiseksi.
+    Gmail-agentin IMAP-haku tukee max ~200 tulosta per haku (120s script timeout).
     """
     IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     processed = load_processed()
@@ -220,12 +219,10 @@ def fetch_camera_images():
         'new_images': [],
     }
 
-    # Gmail-agentin search_emails käyttää 'limit' parametria (ei max_results).
-    # Haetaan suuri määrä kerralla.
     try:
         search_result = gmail_api_call('search_emails', {
             'query': 'from:linckeazi.com',
-            'limit': 500,
+            'limit': 200,
         })
     except Exception as e:
         results['errors'].append(f'Gmail-haku epäonnistui: {e}')
