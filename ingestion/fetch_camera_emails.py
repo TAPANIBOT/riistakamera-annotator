@@ -220,35 +220,18 @@ def fetch_camera_images():
         'new_images': [],
     }
 
-    # Gmail-agentti palauttaa max 20 tulosta per haku.
-    # Tehdään useita hakuja eri aikavälein kattavan haun saamiseksi.
-    queries = [
-        'from:linckeazi.com newer_than:7d',
-        'from:linckeazi.com older_than:7d newer_than:14d',
-        'from:linckeazi.com older_than:14d newer_than:30d',
-        'from:linckeazi.com older_than:30d newer_than:60d',
-        'from:linckeazi.com older_than:60d newer_than:90d',
-        'from:linckeazi.com older_than:90d newer_than:180d',
-        'from:linckeazi.com older_than:180d newer_than:365d',
-        'from:linckeazi.com older_than:365d',
-    ]
+    # Gmail-agentin search_emails käyttää 'limit' parametria (ei max_results).
+    # Haetaan suuri määrä kerralla.
+    try:
+        search_result = gmail_api_call('search_emails', {
+            'query': 'from:linckeazi.com',
+            'limit': 500,
+        })
+    except Exception as e:
+        results['errors'].append(f'Gmail-haku epäonnistui: {e}')
+        return results
 
-    messages = []
-    seen_ids = set()
-    for query in queries:
-        try:
-            search_result = gmail_api_call('search_emails', {
-                'query': query,
-                'max_results': 20,
-            })
-            batch = extract_gmail_messages(search_result)
-            for msg in batch:
-                mid = str(msg.get('id', ''))
-                if mid and mid not in seen_ids:
-                    seen_ids.add(mid)
-                    messages.append(msg)
-        except Exception as e:
-            results['errors'].append(f'Gmail-haku epäonnistui ({query}): {e}')
+    messages = extract_gmail_messages(search_result)
 
     for msg_summary in messages:
         msg_id = str(msg_summary.get('id', ''))
