@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Järjestelmäriippuvuudet OpenCV:lle, Pillowille ja SpeciesNetille
+# Järjestelmäriippuvuudet OpenCV:lle, Pillowille ja SpeciesNetille (ONNX)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
@@ -11,11 +11,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender1 \
     cmake \
     build-essential \
+    libprotobuf-dev \
+    protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*
 
 # Python-riippuvuudet
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt && \
+# Asenna onnx>=1.20 binäärinä ennen muita (ARM64 wheel saatavilla)
+RUN pip install --no-cache-dir "onnx>=1.20" "onnxruntime>=1.20" && \
+    pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir --no-deps megadetector>=10.0.17
 
 # Kopioi sovellus
