@@ -233,11 +233,20 @@ class TestAiBriefAPI:
         assert 'jänis' in text
         assert 'metsäkauris' not in text
 
+    def test_brief_has_daily_and_hourly(self, client):
+        resp = client.get('/api/ai/brief?days=90')
+        assert resp.status_code == 200
+        text = resp.data.decode('utf-8')
+        assert 'Päivät:' in text
+        assert 'Aktiiviset tunnit:' in text
+        # Should contain weekday abbreviations
+        assert any(day in text for day in ['ma', 'ti', 'ke', 'to', 'pe', 'la', 'su'])
+
     def test_brief_detail_full(self, client):
         resp = client.get('/api/ai/brief?days=90&detail=full')
         assert resp.status_code == 200
         text = resp.data.decode('utf-8')
-        assert 'Tunnit:' in text
+        assert 'Tunnit 00-23:' in text
         assert 'AI-tarkkuus:' in text
 
     def test_brief_invalid_days(self, client):
@@ -255,8 +264,8 @@ class TestAiBriefAPI:
     def test_brief_token_count(self, client):
         resp = client.get('/api/ai/brief?days=90')
         text = resp.data.decode('utf-8')
-        assert len(text) < 500, f'Summary too long: {len(text)} chars'
+        assert len(text) < 1500, f'Summary too long: {len(text)} chars'
 
         resp_full = client.get('/api/ai/brief?days=90&detail=full')
         text_full = resp_full.data.decode('utf-8')
-        assert len(text_full) < 800, f'Full detail too long: {len(text_full)} chars'
+        assert len(text_full) < 2000, f'Full detail too long: {len(text_full)} chars'

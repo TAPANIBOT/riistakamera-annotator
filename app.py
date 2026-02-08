@@ -746,13 +746,17 @@ def ai_brief():
 
     images = get_image_files()
 
+    _FI_WEEKDAYS = ['ma', 'ti', 'ke', 'to', 'pe', 'la', 'su']
+
     total_images = 0
     empty_count = 0
     unannotated_count = 0
     total_detections = 0
     species_counts = {}
-    hourly_totals = {}  # hour -> count
-    ai_accuracy = {}    # species -> {correct, total}
+    hourly_totals = {}   # hour -> count
+    daily_counts = {}    # date_str -> count
+    daily_species = {}   # date_str -> {label: count}
+    ai_accuracy = {}     # species -> {correct, total}
 
     for img_name in images:
         camera_date, camera_hour = _parse_camera_datetime(img_name)
@@ -794,6 +798,12 @@ def ai_brief():
             if camera_hour is not None:
                 hourly_totals[camera_hour] = hourly_totals.get(camera_hour, 0) + 1
 
+            if camera_date:
+                daily_counts[camera_date] = daily_counts.get(camera_date, 0) + 1
+                if camera_date not in daily_species:
+                    daily_species[camera_date] = {}
+                daily_species[camera_date][label] = daily_species[camera_date].get(label, 0) + 1
+
             if ann.get('from_prediction'):
                 if sp not in ai_accuracy:
                     ai_accuracy[sp] = {'correct': 0, 'total': 0}
@@ -814,8 +824,7 @@ def ai_brief():
     period_end = (range_end - timedelta(days=1)).strftime('%Y-%m-%d')
     lines.append(f'Riistakamera {days}pv ({period_start} – {period_end})')
     lines.append(
-        f'Kuvia: {total_images} | Havaintoja: {total_detections} | '
-        f'Tyhjiä: {empty_count} | Annotoimattomia: {unannotated_count}'
+        f'Kuvia: {total_images} | Havaintoja: {total_detections} | Tyhjiä: {empty_count}'
     )
 
     # Species sorted by count descending
@@ -823,22 +832,36 @@ def ai_brief():
     species_str = ', '.join(f'{name} {count}' for name, count in sorted_species)
     lines.append(f'Lajit: {species_str}')
 
-    # Top 3 active hours
-    sorted_hours = sorted(hourly_totals.items(), key=lambda x: x[1], reverse=True)
-    top_hours = sorted_hours[:3]
-    if top_hours:
-        hours_str = ', '.join(
-            f'{h:02d}-{(h + 1) % 24:02d} ({c})' for h, c in top_hours
-        )
-        lines.append(f'Aktiivisimmat: {hours_str}')
+    # Daily breakdown — always included
+    # Generate all dates in range so days with 0 also show
+    day_parts = []
+    d = range_start
+    end_date = range_end - timedelta(days=1)
+    while d <= end_date:
+        ds = d.strftime('%Y-%m-%d')
+        weekday = _FI_WEEKDAYS[d.weekday()]
+        count = daily_counts.get(ds, 0)
+        date_short = d.strftime('%d.%m')
+        if count > 0 and daily_species.get(ds):
+            # Show top species for this day
+            top = sorted(daily_species[ds].items(), key=lambda x: x[1], reverse=True)
+            sp_brief = '+'.join(f'{n[:3]}{c}' for n, c in top[:3])
+            day_parts.append(f'{weekday} {date_short}:{count} ({sp_brief})')
+        else:
+            day_parts.append(f'{weekday} {date_short}:0')
+        d += timedelta(days=1)
+    lines.append(f'Päivät: {", ".join(day_parts)}')
+
+    # Hourly activity — always included, compact format with only active hours
+    active_hours = sorted((h, c) for h, c in hourly_totals.items() if c > 0)
+    if active_hours:
+        hour_parts = [f'{h:02d}:{c}' for h, c in active_hours]
+        lines.append(f'Aktiiviset tunnit: {" ".join(hour_parts)}')
 
     if detail == 'full':
-        # Full hourly breakdown
-        hour_parts = []
-        for h in range(24):
-            count = hourly_totals.get(h, 0)
-            hour_parts.append(f'{h:02d}:{count}')
-        lines.append(f'Tunnit: {" ".join(hour_parts)}')
+        # Full 24h hourly breakdown
+        all_hours = [f'{h:02d}:{hourly_totals.get(h, 0)}' for h in range(24)]
+        lines.append(f'Tunnit 00-23: {" ".join(all_hours)}')
 
         # AI accuracy per species
         if ai_accuracy:
