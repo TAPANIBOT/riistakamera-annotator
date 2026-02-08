@@ -4,103 +4,212 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Riistakamera Annotator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Sora:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Riistakamera Annotator</h1>
-            <div class="stats">
-                <span id="image-counter">0 / 0</span>
-                <span id="image-name"></span>
-                <span id="annotation-count">0 annotaatiota</span>
-                <span id="zoom-indicator">Zoom: 100%</span>
+
+    <!-- TOOLBAR -->
+    <header class="toolbar">
+        <div class="toolbar__logo">RIISTA</div>
+        <div class="toolbar__progress">
+            <div class="progress-bar">
+                <div class="progress-bar__fill" id="progress-fill"></div>
             </div>
-        </header>
+            <span class="progress-bar__text" id="progress-text">0 / 0 kuvaa</span>
+        </div>
+        <div class="toolbar__stats">
+            <span class="stat-badge" id="speed-badge">0/h</span>
+            <span class="stat-badge" id="session-time">0:00</span>
+        </div>
+        <div class="toolbar__actions">
+            <label class="toggle" title="Automaattinen seuraava kuva tallennuksen jälkeen">
+                <input type="checkbox" id="auto-advance-toggle" checked>
+                <span class="toggle__slider"></span>
+                <span class="toggle__label">Auto</span>
+            </label>
+            <button class="toolbar__btn" id="shortcuts-btn" title="Pikanäppäimet (?)">?</button>
+        </div>
+    </header>
 
-        <main>
-            <div class="canvas-container">
-                <canvas id="image-canvas"></canvas>
-                <div id="loading">Ladataan kuvia...</div>
-                <div id="no-images" style="display: none;">
-                    Ei kuvia kansiossa. Lisää kuvia /data/images/incoming/ -hakemistoon.
+    <!-- LEFT PANEL: Species -->
+    <aside class="panel panel--left">
+        <div class="panel__section">
+            <h3 class="panel__title">Laji</h3>
+            <div class="species-list" id="species-list">
+                <button class="species-btn" data-species="kauris" data-key="1">
+                    <span class="species-btn__key">1</span>
+                    <span class="species-btn__label">Metsäkauris</span>
+                </button>
+                <button class="species-btn" data-species="peura" data-key="2">
+                    <span class="species-btn__key">2</span>
+                    <span class="species-btn__label">Valkohäntäpeura</span>
+                </button>
+                <button class="species-btn" data-species="janis" data-key="3">
+                    <span class="species-btn__key">3</span>
+                    <span class="species-btn__label">Jänis</span>
+                </button>
+                <button class="species-btn" data-species="linnut" data-key="4">
+                    <span class="species-btn__key">4</span>
+                    <span class="species-btn__label">Linnut</span>
+                </button>
+                <button class="species-btn" data-species="supikoira" data-key="5">
+                    <span class="species-btn__key">5</span>
+                    <span class="species-btn__label">Supikoira</span>
+                </button>
+                <button class="species-btn" data-species="kettu" data-key="6">
+                    <span class="species-btn__key">6</span>
+                    <span class="species-btn__label">Kettu</span>
+                </button>
+                <button class="species-btn" data-species="ihminen" data-key="7">
+                    <span class="species-btn__key">7</span>
+                    <span class="species-btn__label">Ihminen</span>
+                </button>
+                <button class="species-btn" data-species="koira" data-key="8">
+                    <span class="species-btn__key">8</span>
+                    <span class="species-btn__label">Koira</span>
+                </button>
+                <button class="species-btn" data-species="muu" data-key="9">
+                    <span class="species-btn__key">9</span>
+                    <span class="species-btn__label">Muu/tuntematon</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="panel__divider"></div>
+
+        <div class="panel__section">
+            <button class="action-btn action-btn--empty" id="empty-btn">
+                <span class="action-btn__key">E</span>
+                <span>Tyhjä kuva</span>
+            </button>
+        </div>
+
+        <div class="panel__divider"></div>
+
+        <div class="panel__section">
+            <h3 class="panel__title">Suodata</h3>
+            <select class="filter-select" id="filter-select">
+                <option value="all">Kaikki kuvat</option>
+                <option value="annotated">Annotoidut</option>
+                <option value="unannotated">Annotoimattomat</option>
+                <option value="predicted">AI-ennusteet</option>
+                <option value="empty">Tyhjät kuvat</option>
+            </select>
+        </div>
+
+        <div class="panel__divider"></div>
+
+        <div class="panel__section panel__nav">
+            <button class="nav-btn" id="prev-btn" title="Edellinen (P)">&#8592;</button>
+            <span class="nav-counter" id="image-counter">0</span>
+            <button class="nav-btn" id="next-btn" title="Seuraava (N)">&#8594;</button>
+        </div>
+
+        <div class="panel__section">
+            <button class="action-btn action-btn--save" id="save-btn">
+                <span class="action-btn__key">S</span>
+                <span>Tallenna</span>
+            </button>
+            <button class="action-btn action-btn--clear" id="clear-current" title="Tyhjennä piirto (C)">
+                <span>Tyhjennä piirto</span>
+            </button>
+            <button class="action-btn action-btn--uncertain" id="uncertain-btn" title="Epävarmin kuva (U)">
+                <span class="action-btn__key">U</span>
+                <span>Epävarmin</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- CANVAS AREA -->
+    <main class="canvas-area">
+        <div class="canvas-container" id="canvas-container">
+            <canvas id="image-canvas"></canvas>
+            <div class="canvas-overlay" id="loading">Ladataan kuvia...</div>
+            <div class="canvas-overlay" id="no-images" style="display: none;">
+                Ei kuvia kansiossa. Lisää kuvia /data/images/incoming/ -hakemistoon.
+            </div>
+        </div>
+        <div class="image-name" id="image-name"></div>
+    </main>
+
+    <!-- RIGHT PANEL -->
+    <aside class="panel panel--right">
+        <div class="panel__section">
+            <div class="panel__header">
+                <h3 class="panel__title">AI-ennusteet</h3>
+                <button class="accept-all-btn" id="accept-all-btn" title="Hyväksy kaikki (Shift+A)">Hyväksy kaikki</button>
+            </div>
+            <div id="predictions-list" class="card-list">
+                <p class="no-data">Ei AI-ennusteita</p>
+            </div>
+        </div>
+
+        <div class="panel__divider"></div>
+
+        <div class="panel__section">
+            <h3 class="panel__title">Annotaatiot</h3>
+            <ul id="annotations-ul" class="card-list"></ul>
+        </div>
+
+        <div class="panel__divider"></div>
+
+        <div class="panel__section">
+            <h3 class="panel__title">Minimap</h3>
+            <div class="minimap-container">
+                <canvas id="minimap-canvas" width="240" height="160"></canvas>
+            </div>
+        </div>
+    </aside>
+
+    <!-- STATUS BAR -->
+    <footer class="statusbar">
+        <span class="statusbar__item" id="zoom-indicator">Zoom: 100%</span>
+        <span class="statusbar__item statusbar__message" id="status-message"></span>
+        <span class="statusbar__item" id="autosave-indicator">Autosave: ON</span>
+    </footer>
+
+    <!-- SHORTCUTS OVERLAY -->
+    <div class="shortcuts-overlay" id="shortcuts-overlay" style="display: none;">
+        <div class="shortcuts-modal">
+            <div class="shortcuts-modal__header">
+                <h2>Pikanäppäimet</h2>
+                <button class="shortcuts-modal__close" id="shortcuts-close">&times;</button>
+            </div>
+            <div class="shortcuts-grid">
+                <div class="shortcuts-col">
+                    <h4>Annotaatio</h4>
+                    <div class="shortcut-row"><kbd>Enter</kbd><span>Tallenna annotaatio</span></div>
+                    <div class="shortcut-row"><kbd>S</kbd><span>Tallenna annotaatio</span></div>
+                    <div class="shortcut-row"><kbd>1-9</kbd><span>Valitse laji</span></div>
+                    <div class="shortcut-row"><kbd>C</kbd><span>Tyhjennä piirto</span></div>
+                    <div class="shortcut-row"><kbd>E</kbd><span>Tyhjä kuva</span></div>
+                    <div class="shortcut-row"><kbd>Ctrl+Z</kbd><span>Kumoa</span></div>
+                    <div class="shortcut-row"><kbd>Ctrl+Y</kbd><span>Tee uudelleen</span></div>
+                </div>
+                <div class="shortcuts-col">
+                    <h4>Navigointi</h4>
+                    <div class="shortcut-row"><kbd>N</kbd><span>Seuraava kuva</span></div>
+                    <div class="shortcut-row"><kbd>P</kbd><span>Edellinen kuva</span></div>
+                    <div class="shortcut-row"><kbd>U</kbd><span>Epävarmin kuva</span></div>
+                    <div class="shortcut-row"><kbd>Shift+rulla</kbd><span>Zoomaa</span></div>
+                    <div class="shortcut-row"><kbd>Shift+vedä</kbd><span>Panoroi</span></div>
+                </div>
+                <div class="shortcuts-col">
+                    <h4>AI-ennusteet</h4>
+                    <div class="shortcut-row"><kbd>A</kbd><span>Hyväksy ennuste</span></div>
+                    <div class="shortcut-row"><kbd>R</kbd><span>Hylkää ennuste</span></div>
+                    <div class="shortcut-row"><kbd>Shift+A</kbd><span>Hyväksy kaikki</span></div>
+                    <div class="shortcut-row"><kbd>Tab</kbd><span>Seuraava ennuste</span></div>
+                    <div class="shortcut-row"><kbd>?</kbd><span>Tämä ohje</span></div>
                 </div>
             </div>
-
-            <div id="status-message" class="status-message" style="display: none;"></div>
-
-            <div class="controls">
-                <div class="control-group">
-                    <label for="species-select">Laji:</label>
-                    <select id="species-select">
-                        <option value="">-- Valitse laji --</option>
-                        <option value="kauris">1. Metsäkauris</option>
-                        <option value="peura">2. Valkohäntäpeura</option>
-                        <option value="janis">3. Jänis</option>
-                        <option value="linnut">4. Linnut</option>
-                        <option value="supikoira">5. Supikoira</option>
-                        <option value="kettu">6. Kettu</option>
-                        <option value="ihminen">7. Ihminen</option>
-                        <option value="koira">8. Koira</option>
-                        <option value="muu">9. Muu/tuntematon</option>
-                    </select>
-                </div>
-
-                <div class="control-group">
-                    <label for="filter-select">Suodata:</label>
-                    <select id="filter-select">
-                        <option value="all">Kaikki kuvat</option>
-                        <option value="annotated">Annotoidut</option>
-                        <option value="unannotated">Annotoimattomat</option>
-                        <option value="predicted">AI-ennusteet</option>
-                        <option value="empty">Tyhjät kuvat</option>
-                    </select>
-                </div>
-
-                <div class="button-group">
-                    <button id="prev-btn" class="btn btn-secondary">Edellinen</button>
-                    <button id="empty-btn" class="btn btn-empty">Tyhjä kuva</button>
-                    <button id="clear-current" class="btn btn-warning">Tyhjennä</button>
-                    <button id="save-btn" class="btn btn-primary">Tallenna</button>
-                    <button id="uncertain-btn" class="btn btn-uncertain">Epävarmin</button>
-                    <button id="next-btn" class="btn btn-success">Seuraava</button>
-                </div>
-            </div>
-
-            <div class="side-panels">
-                <div class="annotations-list">
-                    <h3>Annotaatiot</h3>
-                    <ul id="annotations-ul"></ul>
-                </div>
-
-                <div class="predictions-panel">
-                    <h3>AI-ennusteet</h3>
-                    <div id="predictions-list">
-                        <p class="no-predictions">Ei AI-ennusteita</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="instructions">
-                <h4>Pikanäppäimet</h4>
-                <div class="shortcuts-grid">
-                    <span class="key">Enter</span><span>Tallenna annotaatio</span>
-                    <span class="key">N</span><span>Seuraava kuva</span>
-                    <span class="key">P</span><span>Edellinen kuva</span>
-                    <span class="key">C</span><span>Tyhjennä piirto</span>
-                    <span class="key">A</span><span>Hyväksy ennuste</span>
-                    <span class="key">R</span><span>Hylkää ennuste</span>
-                    <span class="key">E</span><span>Tyhjä kuva</span>
-                    <span class="key">U</span><span>Epävarmin kuva</span>
-                    <span class="key">1-9</span><span>Valitse laji</span>
-                    <span class="key">Ctrl+Z</span><span>Kumoa</span>
-                    <span class="key">Ctrl+Y</span><span>Tee uudelleen</span>
-                    <span class="key">Shift+rulla</span><span>Zoomaa</span>
-                    <span class="key">Shift+vedä</span><span>Panoroi</span>
-                </div>
-            </div>
-        </main>
+        </div>
     </div>
+
+    <!-- MOBILE DRAWER TOGGLE -->
+    <button class="drawer-toggle drawer-toggle--left" id="drawer-toggle-left" aria-label="Avaa lajipaneeli">&#9776;</button>
+    <button class="drawer-toggle drawer-toggle--right" id="drawer-toggle-right" aria-label="Avaa tietopaneeli">&#9776;</button>
 
     <script src="/static/script.js"></script>
 </body>
